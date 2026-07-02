@@ -1,6 +1,8 @@
 local ModeShift = _G.ModeShift
 
-local AddonManager = {}
+local AddonManager = {
+  installedCache = nil,
+}
 
 local function addonApi()
   return C_AddOns or {}
@@ -66,21 +68,45 @@ function AddonManager:SetEnabled(addonName, enabled)
 
   if enabled then
     if api.EnableAddOn then
-      return ModeShift:SafeCall("EnableAddOn", api.EnableAddOn, addonName, character)
+      local ok, err = ModeShift:SafeCall("EnableAddOn", api.EnableAddOn, addonName, character)
+      self:ClearInstalledCache()
+      return ok, err
     end
     if EnableAddOn then
-      return ModeShift:SafeCall("EnableAddOn", EnableAddOn, addonName, character)
+      local ok, err = ModeShift:SafeCall("EnableAddOn", EnableAddOn, addonName, character)
+      self:ClearInstalledCache()
+      return ok, err
     end
   else
     if api.DisableAddOn then
-      return ModeShift:SafeCall("DisableAddOn", api.DisableAddOn, addonName, character)
+      local ok, err = ModeShift:SafeCall("DisableAddOn", api.DisableAddOn, addonName, character)
+      self:ClearInstalledCache()
+      return ok, err
     end
     if DisableAddOn then
-      return ModeShift:SafeCall("DisableAddOn", DisableAddOn, addonName, character)
+      local ok, err = ModeShift:SafeCall("DisableAddOn", DisableAddOn, addonName, character)
+      self:ClearInstalledCache()
+      return ok, err
     end
   end
 
   return false, "La API de addons no esta disponible"
+end
+
+function AddonManager:ClearInstalledCache()
+  self.installedCache = nil
+end
+
+local function copyAddonList(source)
+  local copy = {}
+  for index, addon in ipairs(source or {}) do
+    copy[index] = {
+      name = addon.name,
+      title = addon.title,
+      enabled = addon.enabled,
+    }
+  end
+  return copy
 end
 
 function AddonManager:SetProfileAddonState(profile, addonName, shouldLoad)
@@ -135,7 +161,11 @@ function AddonManager:ShouldLoadInProfile(profile, addon)
   return false
 end
 
-function AddonManager:GetInstalledAddons()
+function AddonManager:GetInstalledAddons(forceRefresh)
+  if self.installedCache and not forceRefresh then
+    return copyAddonList(self.installedCache)
+  end
+
   local addons = {}
   local api = addonApi()
   local count = 0
@@ -154,6 +184,7 @@ function AddonManager:GetInstalledAddons()
     end
   end
 
+  self.installedCache = copyAddonList(addons)
   return addons
 end
 
@@ -167,7 +198,7 @@ function AddonManager:Apply(profile)
   end
 
   local changed = {}
-  local installed = self:GetInstalledAddons()
+  local installed = self:GetInstalledAddons(true)
   for _, addon in ipairs(installed) do
     local shouldLoad = self:ShouldLoadInProfile(profile, addon)
     if shouldLoad then
@@ -202,6 +233,12 @@ function AddonManager:Apply(profile)
   end
 
   return result
+end
+
+function AddonManager:OnEvent(event)
+  if event == "ADDON_LOADED" then
+    self:ClearInstalledCache()
+  end
 end
 
 ModeShift:RegisterModule("AddonManager", AddonManager)

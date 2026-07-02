@@ -42,6 +42,9 @@ local function raiseFrame(frame)
 
   frame:SetFrameStrata("TOOLTIP")
   frame:SetFrameLevel(9000)
+  if frame.SetToplevel then
+    frame:SetToplevel(true)
+  end
   if frame.Raise then
     frame:Raise()
   end
@@ -135,7 +138,7 @@ function ConfigUI:Initialize()
   end
 
   local frame = CreateFrame("Frame", "ModeShiftConfigFrame", UIParent, "BasicFrameTemplateWithInset")
-  frame:SetSize(930, 650)
+  frame:SetSize(1040, 650)
   frame:SetPoint("CENTER")
   raiseFrame(frame)
   frame:SetMovable(true)
@@ -149,6 +152,12 @@ function ConfigUI:Initialize()
   frame:SetScript("OnHide", function()
     if GameTooltip then
       GameTooltip:Hide()
+    end
+    if MenuUtil and MenuUtil.CloseAllMenus then
+      MenuUtil.CloseAllMenus()
+    end
+    if CloseMenus then
+      CloseMenus()
     end
     if self.importFrame then
       self.importFrame:Hide()
@@ -221,7 +230,7 @@ function ConfigUI:Initialize()
 
   frame.editorScroll = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
   frame.editorScroll:SetPoint("TOPLEFT", 285, -66)
-  frame.editorScroll:SetSize(610, 540)
+  frame.editorScroll:SetSize(720, 540)
 
   self.frame = frame
 end
@@ -383,7 +392,7 @@ end
 
 function ConfigUI:RefreshEditor()
   local child = clearScroll(self.frame.editorScroll)
-  child:SetSize(570, 1)
+  child:SetSize(680, 1)
 
   local profile = self:GetSelectedProfile()
   if not profile then
@@ -666,16 +675,15 @@ function ConfigUI:BuildAddonsTab(parent, profile, y)
 
   local addons = ModeShift.AddonManager:GetInstalledAddons()
   for _, addon in ipairs(addons) do
-    addon.modeShiftProfiles = ModeShift.AddonProfileManager and ModeShift.AddonProfileManager:GetAvailableProfiles(addon.name) or {}
-    addon.modeShiftProfileCount = #addon.modeShiftProfiles
     addon.modeShiftSelected = ModeShift.AddonManager:ShouldLoadInProfile(profile, addon)
+    addon.modeShiftHasEntry = profile.addonProfiles and profile.addonProfiles.entries and profile.addonProfiles.entries[addon.name] ~= nil
   end
   table.sort(addons, function(a, b)
     if a.modeShiftSelected ~= b.modeShiftSelected then
       return a.modeShiftSelected
     end
-    if (a.modeShiftProfileCount or 0) ~= (b.modeShiftProfileCount or 0) then
-      return (a.modeShiftProfileCount or 0) > (b.modeShiftProfileCount or 0)
+    if a.modeShiftHasEntry ~= b.modeShiftHasEntry then
+      return a.modeShiftHasEntry
     end
     return string.lower(a.name or "") < string.lower(b.name or "")
   end)
@@ -700,7 +708,10 @@ function ConfigUI:BuildAddonsTab(parent, profile, y)
   stateHeader:SetWidth(55)
   local profileHeader = makeText(parent, "Perfil interno", "GameFontNormalSmall")
   profileHeader:SetPoint("TOPLEFT", 320, y)
-  profileHeader:SetWidth(200)
+  profileHeader:SetWidth(210)
+  local configHeader = makeText(parent, "Config", "GameFontNormalSmall")
+  configHeader:SetPoint("TOPLEFT", 560, y)
+  configHeader:SetWidth(100)
   y = y - 22
 
   for _, addon in ipairs(addons) do
@@ -728,6 +739,7 @@ function ConfigUI:BuildAddonsTab(parent, profile, y)
     details:SetWidth(190)
 
     y = self:BuildAddonProfilePicker(parent, profile, addon.name, y)
+    self:BuildAddonOptionPicker(parent, profile, addon.name, y)
     y = y - 32
   end
 
@@ -738,61 +750,47 @@ function ConfigUI:BuildAddonProfilePicker(parent, profile, addonName, y)
   profile.addonProfiles = profile.addonProfiles or { enabled = false, entries = {} }
   profile.addonProfiles.entries = profile.addonProfiles.entries or {}
 
-  local integration = ModeShift.Integrations and ModeShift.Integrations:Get(addonName)
-  local profiles = ModeShift.AddonProfileManager and ModeShift.AddonProfileManager:GetAvailableProfiles(addonName) or {}
-  local currentProfile = ModeShift.AddonProfileManager and ModeShift.AddonProfileManager:GetCurrentProfile(addonName) or nil
-  if not integration and #profiles == 0 and not currentProfile then
-    return y
-  end
-
   local entry = profile.addonProfiles.entries[addonName] or { enabled = false, profileName = nil }
-  if not entry.profileName and currentProfile then
-    entry.enabled = true
-    entry.profileName = currentProfile
-    profile.addonProfiles.enabled = true
-    profile.addonProfiles.entries[addonName] = entry
-    ModeShift.ProfileManager:SaveProfile(profile)
-  end
+  local selected = entry.enabled and entry.profileName or "Perfil..."
 
-  local label = integration and integration.displayName or addonName
-  local selected = entry.enabled and entry.profileName or currentProfile or "Sin perfil activo"
-
-  local currentButton = makeButton(parent, selected, 190, 22, function(button)
-    self:OpenAddonProfileDropdown(button, profile, addonName, profiles, currentProfile)
+  local currentButton = makeButton(parent, selected, 220, 22, function(button)
+    self:OpenAddonProfileDropdown(button, profile, addonName)
   end)
   currentButton:SetPoint("TOPLEFT", 320, y)
-
-  local clearButton = makeButton(parent, "X", 24, 22, function()
-    profile.addonProfiles.entries[addonName] = nil
-    self:SaveProfile(profile)
-  end)
-  clearButton:SetPoint("LEFT", currentButton, "RIGHT", 4, 0)
-
-  if #profiles == 0 and currentProfile then
-    local note = makeText(parent, label .. ": perfil activo detectado", "GameFontDisableSmall")
-    note:SetPoint("TOPLEFT", 320, y - 16)
-    note:SetWidth(230)
-    return y
-  end
-
-  local note = makeText(parent, tostring(#profiles) .. " perfiles detectados", "GameFontDisableSmall")
-  note:SetPoint("TOPLEFT", 320, y - 16)
-  note:SetWidth(230)
 
   return y
 end
 
 function ConfigUI:SetAddonProfile(profile, addonName, profileName)
   profile.addonProfiles.enabled = true
+  if profileName == nil then
+    local entry = profile.addonProfiles.entries[addonName]
+    if type(entry) == "table" and entry.optionName then
+      entry.enabled = true
+      entry.profileName = nil
+      profile.addonProfiles.entries[addonName] = entry
+    else
+      profile.addonProfiles.entries[addonName] = nil
+    end
+    self:SaveProfile(profile)
+    return
+  end
+
+  local entry = profile.addonProfiles.entries[addonName] or { enabled = true }
+  entry.enabled = true
+  entry.profileName = profileName
   profile.addonProfiles.entries[addonName] = {
-    enabled = profileName ~= nil,
-    profileName = profileName,
+    enabled = true,
+    profileName = entry.profileName,
+    optionName = entry.optionName,
   }
   self:SaveProfile(profile)
 end
 
-function ConfigUI:OpenAddonProfileDropdown(anchor, profile, addonName, profiles, currentProfile)
+function ConfigUI:OpenAddonProfileDropdown(anchor, profile, addonName)
   raiseFrame(self.frame)
+  local profiles = ModeShift.AddonProfileManager and ModeShift.AddonProfileManager:GetAvailableProfiles(addonName, true) or {}
+  local currentProfile = ModeShift.AddonProfileManager and ModeShift.AddonProfileManager:GetCurrentProfile(addonName, true) or nil
 
   if MenuUtil and MenuUtil.CreateContextMenu then
     MenuUtil.CreateContextMenu(anchor, function(_, root)
@@ -806,6 +804,9 @@ function ConfigUI:OpenAddonProfileDropdown(anchor, profile, addonName, profiles,
         root:CreateButton(profileName, function()
           self:SetAddonProfile(profile, addonName, profileName)
         end)
+      end
+      if (not profiles or #profiles == 0) and not currentProfile then
+        root:CreateTitle("No he encontrado perfiles")
       end
       root:CreateDivider()
       root:CreateButton("Limpiar seleccion", function()
@@ -821,6 +822,69 @@ function ConfigUI:OpenAddonProfileDropdown(anchor, profile, addonName, profiles,
   else
     self:SetAddonProfile(profile, addonName, nil)
   end
+end
+
+function ConfigUI:BuildAddonOptionPicker(parent, profile, addonName, y)
+  if not (ModeShift.AddonProfileManager and ModeShift.AddonProfileManager:CanShowOptionPicker(addonName)) then
+    return
+  end
+
+  profile.addonProfiles = profile.addonProfiles or { enabled = false, entries = {} }
+  profile.addonProfiles.entries = profile.addonProfiles.entries or {}
+  local entry = profile.addonProfiles.entries[addonName] or { enabled = false, profileName = nil, optionName = nil }
+  local selected = entry.optionName or "Config..."
+
+  local button = makeButton(parent, selected, 110, 22, function(anchor)
+    self:OpenAddonOptionDropdown(anchor, profile, addonName)
+  end)
+  button:SetPoint("TOPLEFT", 560, y)
+end
+
+function ConfigUI:SetAddonOption(profile, addonName, optionName)
+  profile.addonProfiles.enabled = true
+  local entry = profile.addonProfiles.entries[addonName] or { enabled = true }
+  if optionName == nil and not entry.profileName then
+    profile.addonProfiles.entries[addonName] = nil
+    self:SaveProfile(profile)
+    return
+  end
+
+  entry.enabled = true
+  entry.optionName = optionName
+  profile.addonProfiles.entries[addonName] = entry
+  self:SaveProfile(profile)
+end
+
+function ConfigUI:OpenAddonOptionDropdown(anchor, profile, addonName)
+  raiseFrame(self.frame)
+  local options = ModeShift.AddonProfileManager and ModeShift.AddonProfileManager:GetAvailableOptions(addonName, true) or {}
+  local currentOption = ModeShift.AddonProfileManager and ModeShift.AddonProfileManager:GetCurrentOption(addonName, true) or nil
+
+  if MenuUtil and MenuUtil.CreateContextMenu then
+    MenuUtil.CreateContextMenu(anchor, function(_, root)
+      root:CreateTitle(addonName .. " config")
+      if currentOption then
+        root:CreateButton("Usar actual: " .. currentOption, function()
+          self:SetAddonOption(profile, addonName, currentOption)
+        end)
+      end
+      for _, optionName in ipairs(options or {}) do
+        root:CreateButton(optionName, function()
+          self:SetAddonOption(profile, addonName, optionName)
+        end)
+      end
+      if (not options or #options == 0) and not currentOption then
+        root:CreateTitle("No he encontrado configs")
+      end
+      root:CreateDivider()
+      root:CreateButton("Limpiar seleccion", function()
+        self:SetAddonOption(profile, addonName, nil)
+      end)
+    end)
+    return
+  end
+
+  self:SetAddonOption(profile, addonName, currentOption or (options and options[1]) or nil)
 end
 
 function ConfigUI:BuildCVarsTab(parent, profile, y)
@@ -899,6 +963,9 @@ function ConfigUI:SerializeProfile(profile)
     if type(entry) == "table" and entry.enabled and entry.profileName then
       table.insert(lines, "addonProfile." .. escapeValue(addonName) .. "=" .. escapeValue(entry.profileName))
     end
+    if type(entry) == "table" and entry.enabled and entry.optionName then
+      table.insert(lines, "addonOption." .. escapeValue(addonName) .. "=" .. escapeValue(entry.optionName))
+    end
   end
 
   table.insert(lines, "cvars.enabled=" .. (profile.cvars.enabled and "1" or "0"))
@@ -973,10 +1040,15 @@ function ConfigUI:DeserializeProfile(text)
         elseif key:match("^addonProfile%.") then
           local addonName = unescapeValue(key:gsub("^addonProfile%.", ""))
           profile.addonProfiles.enabled = true
-          profile.addonProfiles.entries[addonName] = {
-            enabled = true,
-            profileName = value,
-          }
+          profile.addonProfiles.entries[addonName] = profile.addonProfiles.entries[addonName] or { enabled = true }
+          profile.addonProfiles.entries[addonName].enabled = true
+          profile.addonProfiles.entries[addonName].profileName = value
+        elseif key:match("^addonOption%.") then
+          local addonName = unescapeValue(key:gsub("^addonOption%.", ""))
+          profile.addonProfiles.enabled = true
+          profile.addonProfiles.entries[addonName] = profile.addonProfiles.entries[addonName] or { enabled = true }
+          profile.addonProfiles.entries[addonName].enabled = true
+          profile.addonProfiles.entries[addonName].optionName = value
         elseif key == "cvars.enabled" then
           profile.cvars.enabled = value == "1"
         elseif key:match("^cvar%.") then

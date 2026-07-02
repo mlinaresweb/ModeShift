@@ -138,7 +138,7 @@ function ProfileManager:CaptureCurrentAddons(profile)
   profile.addons.enable = {}
   profile.addons.disable = {}
 
-  for _, addon in ipairs(ModeShift.AddonManager:GetInstalledAddons()) do
+  for _, addon in ipairs(ModeShift.AddonManager:GetInstalledAddons(true)) do
     if addon.name == ModeShift.addonName then
       table.insert(profile.addons.enable, addon.name)
     elseif addon.enabled then
@@ -147,8 +147,6 @@ function ProfileManager:CaptureCurrentAddons(profile)
       table.insert(profile.addons.disable, addon.name)
     end
   end
-
-  self:CaptureCurrentAddonProfiles(profile)
 
   return profile
 end
@@ -162,7 +160,7 @@ function ProfileManager:CaptureCurrentAddonProfiles(profile)
   profile.addonProfiles.enabled = true
   profile.addonProfiles.entries = profile.addonProfiles.entries or {}
 
-  for _, addon in ipairs(ModeShift.AddonManager:GetInstalledAddons()) do
+  for _, addon in ipairs(ModeShift.AddonManager:GetInstalledAddons(true)) do
     local currentProfile = ModeShift.AddonProfileManager:GetCurrentProfile(addon.name)
     local profiles = ModeShift.AddonProfileManager:GetAvailableProfiles(addon.name)
     if currentProfile or #profiles > 0 then
