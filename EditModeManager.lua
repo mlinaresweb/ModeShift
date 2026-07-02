@@ -13,6 +13,7 @@ local function addLayout(layouts, candidate, fallbackIndex)
     table.insert(layouts, {
       id = id,
       name = name or tostring(id),
+      active = candidate.active or candidate.isActive or candidate.isCurrent or candidate.selected,
     })
   end
 end
@@ -78,6 +79,85 @@ function EditModeManager:FindLayout(editMode)
   end
 
   return nil
+end
+
+function EditModeManager:GetCurrentLayout()
+  local layouts = self:GetLayouts()
+
+  local candidates = {}
+  if C_EditMode then
+    local methods = {
+      "GetActiveLayout",
+      "GetActiveLayoutInfo",
+      "GetCurrentLayout",
+      "GetCurrentLayoutInfo",
+      "GetSelectedLayout",
+      "GetSelectedLayoutInfo",
+    }
+    for _, methodName in ipairs(methods) do
+      if type(C_EditMode[methodName]) == "function" then
+        local ok, result1, result2 = ModeShift:SafeCall(methodName, C_EditMode[methodName])
+        if ok then
+          table.insert(candidates, result1)
+          table.insert(candidates, result2)
+        end
+      end
+    end
+  end
+
+  for _, candidate in ipairs(candidates) do
+    if type(candidate) == "table" then
+      local layout = self:FindLayout({
+        layoutId = candidate.layoutIndex or candidate.layoutId or candidate.id,
+        layoutName = candidate.layoutName or candidate.name or candidate.displayName,
+      })
+      if layout then
+        return layout
+      end
+    elseif type(candidate) == "number" then
+      for _, layout in ipairs(layouts) do
+        if layout.id == candidate then
+          return layout
+        end
+      end
+    elseif type(candidate) == "string" then
+      local wanted = candidate:lower()
+      for _, layout in ipairs(layouts) do
+        if layout.name and layout.name:lower() == wanted then
+          return layout
+        end
+      end
+    end
+  end
+
+  for _, layout in ipairs(layouts) do
+    if layout.active then
+      return layout
+    end
+  end
+
+  return nil
+end
+
+function EditModeManager:ApplyLayoutByName(layoutName)
+  if ModeShift:IsInCombat() then
+    return false, "No se puede cambiar Edit Mode en combate"
+  end
+
+  if not (C_EditMode and C_EditMode.SetActiveLayout) then
+    return false, "La API de Edit Mode no esta disponible"
+  end
+
+  local layout = self:FindLayout({ layoutName = layoutName })
+  if not layout then
+    return false, "No encuentro el layout " .. tostring(layoutName)
+  end
+
+  local ok, err = ModeShift:SafeCall("SetActiveLayout", C_EditMode.SetActiveLayout, layout.id)
+  if ok then
+    return true
+  end
+  return false, err
 end
 
 function EditModeManager:Apply(profile)

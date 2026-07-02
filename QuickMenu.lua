@@ -19,7 +19,7 @@ local function profileReloadHint(profile)
 end
 
 local function selectedProfileText(profile)
-  return "[X] " .. tostring(profile.name or profile.id or "Perfil")
+  return "|cffff4a35" .. tostring(profile.name or profile.id or "Perfil") .. "|r"
 end
 
 function QuickMenu:GetProfiles()

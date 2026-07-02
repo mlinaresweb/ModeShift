@@ -29,6 +29,7 @@ local function makeButton(parent, text, width, height, onClick)
   local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
   button:SetSize(width or 120, height or 24)
   button:SetText(text or "")
+  button:RegisterForClicks("AnyUp")
   if onClick then
     button:SetScript("OnClick", onClick)
   end
@@ -80,6 +81,66 @@ local function makeText(parent, text, font)
   return label
 end
 
+local function styleButton(button, selected)
+  if not button then
+    return
+  end
+
+  if not button.modeShiftSelectedBg then
+    button.modeShiftSelectedBg = button:CreateTexture(nil, "BACKGROUND")
+    button.modeShiftSelectedBg:SetPoint("TOPLEFT", 2, -2)
+    button.modeShiftSelectedBg:SetPoint("BOTTOMRIGHT", -2, 2)
+    button.modeShiftSelectedBg:SetColorTexture(0.55, 0.02, 0.02, 0.85)
+  end
+  button.modeShiftSelectedBg:SetShown(selected and true or false)
+
+  local fontString = button:GetFontString()
+  if fontString then
+    fontString:SetTextColor(1, 0.82, 0)
+  end
+
+  local normal = button.GetNormalTexture and button:GetNormalTexture()
+  if normal and normal.SetVertexColor then
+    if selected then
+      normal:SetVertexColor(0.72, 0.08, 0.05, 1)
+    else
+      normal:SetVertexColor(1, 1, 1, 1)
+    end
+  end
+end
+
+local function addHover(button, selected)
+  if not button then
+    return
+  end
+
+  button:SetScript("OnEnter", function(self)
+    local fontString = self:GetFontString()
+    if fontString then
+      fontString:SetTextColor(1, 1, 1)
+    end
+    if self.modeShiftSelectedBg then
+      self.modeShiftSelectedBg:SetColorTexture(selected and 0.78 or 0.4, selected and 0.05 or 0.03, selected and 0.03 or 0.02, selected and 0.95 or 0.55)
+      self.modeShiftSelectedBg:Show()
+    end
+    local normal = self.GetNormalTexture and self:GetNormalTexture()
+    if normal and normal.SetVertexColor then
+      if selected then
+        normal:SetVertexColor(0.95, 0.16, 0.1, 1)
+      else
+        normal:SetVertexColor(1.25, 1.25, 1.25, 1)
+      end
+    end
+  end)
+  button:SetScript("OnLeave", function(self)
+    if self.modeShiftSelectedBg then
+      self.modeShiftSelectedBg:SetColorTexture(0.55, 0.02, 0.02, 0.85)
+      self.modeShiftSelectedBg:SetShown(selected and true or false)
+    end
+    styleButton(self, selected)
+  end)
+end
+
 local function setButtonPoint(button, x, y)
   button:ClearAllPoints()
   button:SetPoint("TOPLEFT", x, y)
@@ -116,10 +177,6 @@ local function setShown(frame, shown)
   end
 end
 
-local function selectedText(text)
-  return "[X] " .. tostring(text or "")
-end
-
 local function escapeValue(value)
   value = tostring(value or "")
   value = value:gsub("\\", "\\\\")
@@ -136,6 +193,10 @@ local function unescapeValue(value)
   return value
 end
 
+local function isCooldownManagerAddon(addonName)
+  return tostring(addonName or ""):lower():find("cooldownmanager", 1, true) ~= nil
+end
+
 function ConfigUI:Initialize()
   if self.frame then
     return
@@ -145,6 +206,12 @@ function ConfigUI:Initialize()
   frame:SetSize(1040, 650)
   frame:SetPoint("CENTER")
   raiseFrame(frame)
+  if frame.SetBackdropColor then
+    frame:SetBackdropColor(0.025, 0.025, 0.025, 0.96)
+  end
+  if frame.SetBackdropBorderColor then
+    frame:SetBackdropBorderColor(0.75, 0.08, 0.04, 1)
+  end
   frame:SetMovable(true)
   frame:EnableMouse(true)
   frame:RegisterForDrag("LeftButton")
@@ -175,6 +242,16 @@ function ConfigUI:Initialize()
 
   frame.leftTitle = makeText(frame, "Perfiles", "GameFontNormal")
   frame.leftTitle:SetPoint("TOPLEFT", 16, -36)
+
+  frame.leftPanelBg = frame:CreateTexture(nil, "BACKGROUND")
+  frame.leftPanelBg:SetColorTexture(0, 0, 0, 0.35)
+  frame.leftPanelBg:SetPoint("TOPLEFT", 12, -54)
+  frame.leftPanelBg:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", 272, 86)
+
+  frame.editorPanelBg = frame:CreateTexture(nil, "BACKGROUND")
+  frame.editorPanelBg:SetColorTexture(0, 0, 0, 0.28)
+  frame.editorPanelBg:SetPoint("TOPLEFT", 280, -60)
+  frame.editorPanelBg:SetPoint("BOTTOMRIGHT", -24, 18)
 
   frame.profileScroll = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
   frame.profileScroll:SetPoint("TOPLEFT", 16, -60)
@@ -236,14 +313,28 @@ function ConfigUI:Initialize()
   frame.editorScroll = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
   frame.editorScroll:SetPoint("TOPLEFT", 285, -66)
   frame.editorScroll:SetSize(720, 540)
+  frame.editorScroll:HookScript("OnVerticalScroll", function()
+    self:CloseDropdown()
+  end)
+  frame.editorScroll:HookScript("OnMouseWheel", function()
+    self:CloseDropdown()
+  end)
 
   self.frame = frame
 end
 
 function ConfigUI:CloseDropdown()
+  if CloseDropDownMenus then
+    CloseDropDownMenus()
+  end
+
   if self.dropdown then
     self.dropdown:Hide()
-    self.dropdown = nil
+    if self.dropdown.rows then
+      for _, row in ipairs(self.dropdown.rows) do
+        row:Hide()
+      end
+    end
   end
 end
 
@@ -253,46 +344,235 @@ function ConfigUI:OpenDropdown(anchor, title, items, width)
     return
   end
 
-  local rowHeight = 24
-  local dropdown = CreateFrame("Frame", "ModeShiftDropdownFrame", UIParent, "BasicFrameTemplateWithInset")
-  dropdown:SetSize(width or 260, math.min(560, 34 + (#items * rowHeight)))
-  dropdown:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -4)
-  dropdown:SetClampedToScreen(true)
-  raiseFrame(dropdown)
-  dropdown:SetFrameLevel(10000)
-  dropdown:EnableMouse(true)
+  if not self.dropdown then
+    self.dropdown = CreateFrame("Frame", "ModeShiftDropdownMenu", self.frame or UIParent, "BackdropTemplate")
+    self.dropdown:SetFrameStrata("TOOLTIP")
+    self.dropdown:SetFrameLevel(((self.frame and self.frame:GetFrameLevel()) or 100) + 100)
+    self.dropdown:SetToplevel(true)
+    self.dropdown:EnableMouse(true)
+    if self.dropdown.EnableMouseWheel then
+      self.dropdown:EnableMouseWheel(true)
+    end
+    self.dropdown:SetClampedToScreen(true)
+    self.dropdown.rows = {}
+    self.dropdown:SetBackdrop({
+      bgFile = "Interface\\Buttons\\WHITE8X8",
+      edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+      edgeSize = 12,
+      insets = { left = 3, right = 3, top = 3, bottom = 3 },
+    })
 
-  dropdown.title = makeText(dropdown, title or "Seleccion", "GameFontNormalSmall")
-  dropdown.title:SetPoint("TOPLEFT", 10, -8)
-  dropdown.title:SetWidth((width or 260) - 20)
+    self.dropdown.title = self.dropdown:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    self.dropdown.title:SetPoint("TOPLEFT", 12, -10)
+    self.dropdown.title:SetJustifyH("LEFT")
+  end
 
-  local y = -28
-  for _, item in ipairs(items) do
-    local itemData = item
-    if item.divider then
-      local line = dropdown:CreateTexture(nil, "ARTWORK")
-      line:SetColorTexture(0.6, 0.6, 0.6, 0.35)
-      line:SetPoint("TOPLEFT", 10, y - 6)
-      line:SetSize((width or 260) - 20, 1)
-      y = y - 10
-    else
-      local label = itemData.selected and selectedText(itemData.text) or tostring(itemData.text or "")
-      local button = makeButton(dropdown, label, (width or 260) - 20, 22, function()
-        self:CloseDropdown()
-        if type(itemData.onClick) == "function" then
-          itemData.onClick()
+  local menuItems = items
+  local menuTitle = title or "Seleccion"
+  local menuWidth = width or 320
+  local rowHeight = 22
+  local titleHeight = 30
+  local padding = 12
+  local dividerHeight = 9
+  local maxVisibleRows = 12
+  local dropdown = self.dropdown
+  local rows = dropdown.rows
+  dropdown:SetParent(self.frame or UIParent)
+  dropdown:SetFrameLevel(((self.frame and self.frame:GetFrameLevel()) or 100) + 100)
+
+  local function runItem(itemData)
+    self:CloseDropdown()
+    if itemData and type(itemData.onClick) == "function" then
+      itemData.onClick()
+    end
+
+    if C_Timer and C_Timer.After then
+      C_Timer.After(0, function()
+        if self.frame and self.frame:IsShown() then
+          self:Refresh()
         end
       end)
-      button:SetPoint("TOPLEFT", 10, y)
-      button:SetFrameLevel(dropdown:GetFrameLevel() + 1)
-      if itemData.disabled then
-        button:Disable()
-      end
-      y = y - rowHeight
+    elseif self.frame and self.frame:IsShown() then
+      self:Refresh()
     end
   end
 
-  self.dropdown = dropdown
+  local renderRows
+  local maxOffset = math.max(0, #menuItems - maxVisibleRows)
+  local selectedIndex = 1
+  for index, item in ipairs(menuItems) do
+    if item.selected then
+      selectedIndex = index
+      break
+    end
+  end
+  dropdown.scrollOffset = math.max(0, math.min(maxOffset, selectedIndex - 4))
+
+  local function scrollDropdown(delta)
+    if maxOffset <= 0 then
+      return
+    end
+
+    local oldOffset = dropdown.scrollOffset or 0
+    local newOffset = oldOffset
+    if delta and delta < 0 then
+      newOffset = math.min(maxOffset, oldOffset + 3)
+    else
+      newOffset = math.max(0, oldOffset - 3)
+    end
+
+    if newOffset ~= oldOffset then
+      dropdown.scrollOffset = newOffset
+      if renderRows then
+        renderRows()
+      end
+    end
+  end
+
+  dropdown:SetScript("OnMouseWheel", function(_, delta)
+    scrollDropdown(delta)
+  end)
+
+  local function ensureRow(index)
+    if rows[index] then
+      return rows[index]
+    end
+
+    local row = CreateFrame("Button", nil, self.frame or UIParent, "UIPanelButtonTemplate")
+    row:SetFrameStrata("TOOLTIP")
+    row:SetFrameLevel(dropdown:GetFrameLevel() + 10)
+    if row.SetToplevel then
+      row:SetToplevel(true)
+    end
+    row:SetHitRectInsets(0, 0, 0, 0)
+    row:EnableMouse(true)
+    if row.EnableMouseWheel then
+      row:EnableMouseWheel(true)
+    end
+    row:RegisterForClicks("LeftButtonUp")
+
+    row.bg = row:CreateTexture(nil, "BORDER")
+    row.bg:SetAllPoints()
+
+    row.check = row:CreateTexture(nil, "OVERLAY")
+    row.check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
+    row.check:SetSize(16, 16)
+    row.check:SetPoint("LEFT", 5, 0)
+
+    row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    row.text:SetPoint("LEFT", 26, 0)
+    row.text:SetPoint("RIGHT", -8, 0)
+    row.text:SetJustifyH("LEFT")
+    if row.text.SetWordWrap then
+      row.text:SetWordWrap(false)
+    end
+
+    rows[index] = row
+    return row
+  end
+
+  dropdown:ClearAllPoints()
+  dropdown:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -3)
+  dropdown:SetBackdropColor(0.015, 0.015, 0.018, 1)
+  dropdown:SetBackdropBorderColor(0.95, 0.82, 0.18, 1)
+  dropdown:SetWidth(menuWidth)
+  dropdown.title:SetText(menuTitle)
+  dropdown.title:SetWidth(menuWidth - 24)
+
+  renderRows = function()
+    for _, row in ipairs(rows) do
+      row:Hide()
+    end
+
+    local y = -titleHeight
+    local rowIndex = 0
+    local firstItem = (dropdown.scrollOffset or 0) + 1
+    local lastItem = math.min(#menuItems, firstItem + maxVisibleRows - 1)
+
+    for itemIndex = firstItem, lastItem do
+      local itemData = menuItems[itemIndex]
+      if itemData.divider then
+        rowIndex = rowIndex + 1
+        local row = ensureRow(rowIndex)
+        row:SetParent(self.frame or UIParent)
+        row:SetFrameStrata("TOOLTIP")
+        row:SetFrameLevel(dropdown:GetFrameLevel() + 20)
+        if row.SetToplevel then
+          row:SetToplevel(true)
+        end
+        row:ClearAllPoints()
+        row:SetSize(menuWidth - 12, dividerHeight)
+        row:SetPoint("TOPLEFT", dropdown, "TOPLEFT", 6, y)
+        row.bg:ClearAllPoints()
+        row.bg:SetColorTexture(0.78, 0.78, 0.78, 0.22)
+        row.bg:SetPoint("LEFT", 8, 0)
+        row.bg:SetPoint("RIGHT", -8, 0)
+        row.bg:SetHeight(1)
+        row.check:Hide()
+        row.text:SetText("")
+        row:SetScript("OnEnter", nil)
+        row:SetScript("OnLeave", nil)
+        row:SetScript("OnClick", nil)
+        row:SetScript("OnMouseWheel", function(_, delta)
+          scrollDropdown(delta)
+        end)
+        row:Disable()
+        row:Show()
+        y = y - dividerHeight
+      else
+        rowIndex = rowIndex + 1
+        local row = ensureRow(rowIndex)
+        local selected = itemData.selected and true or false
+        local disabled = itemData.disabled and true or false
+
+        row:SetParent(self.frame or UIParent)
+        row:SetFrameStrata("TOOLTIP")
+        row:SetFrameLevel(dropdown:GetFrameLevel() + 20)
+        if row.SetToplevel then
+          row:SetToplevel(true)
+        end
+        row:ClearAllPoints()
+        row.bg:ClearAllPoints()
+        row.bg:SetAllPoints()
+        row:SetSize(menuWidth - 12, rowHeight)
+        row:SetPoint("TOPLEFT", dropdown, "TOPLEFT", 6, y)
+        row.text:SetText(tostring(itemData.text or ""))
+        row.text:SetTextColor(disabled and 0.45 or 1, disabled and 0.45 or 0.82, disabled and 0.45 or 0.05)
+        row:SetText("")
+        row.check:SetShown(selected)
+        row.bg:SetColorTexture(selected and 0.45 or 0.02, selected and 0.02 or 0.02, selected and 0.02 or 0.025, selected and 1 or 1)
+        row:SetScript("OnMouseWheel", function(_, delta)
+          scrollDropdown(delta)
+        end)
+
+        if disabled then
+          row:Disable()
+          row:SetScript("OnEnter", nil)
+          row:SetScript("OnLeave", nil)
+          row:SetScript("OnClick", nil)
+        else
+          row:Enable()
+          row:SetScript("OnEnter", function(self)
+            self.bg:SetColorTexture(0.78, 0.58, 0.02, 0.95)
+            self.text:SetTextColor(1, 1, 1)
+          end)
+          row:SetScript("OnLeave", function(self)
+            self.bg:SetColorTexture(selected and 0.45 or 0.02, selected and 0.02 or 0.02, selected and 0.02 or 0.025, selected and 1 or 1)
+            self.text:SetTextColor(1, 0.82, 0.05)
+          end)
+          row:SetScript("OnClick", function()
+            runItem(itemData)
+          end)
+        end
+        row:Show()
+        y = y - rowHeight
+      end
+    end
+
+    dropdown:SetHeight(math.abs(y) + padding)
+  end
+
+  renderRows()
   dropdown:Show()
 end
 
@@ -382,15 +662,14 @@ function ConfigUI:RefreshProfileList()
 
   for _, profile in ipairs(profiles) do
     local name = profile.name or "Perfil"
-    local label = profile.id == activeProfileId and selectedText(name) or name
-    local button = makeButton(child, label, 210, 26, function()
+    local selected = profile.id == activeProfileId
+    local button = makeButton(child, name, 210, 26, function()
       self.selectedProfileId = profile.id
       self:Refresh()
     end)
+    styleButton(button, selected)
+    addHover(button, selected)
     setButtonPoint(button, 2, y)
-    if profile.id == self.selectedProfileId then
-      button:Disable()
-    end
     y = y - 30
   end
 
@@ -526,10 +805,12 @@ function ConfigUI:BuildProfileTab(parent, profile, y)
   local rowY = y
   for index, modeType in ipairs(MODE_TYPES) do
     local selected = profile.modeType == modeType
-    local button = makeButton(parent, selected and selectedText(modeType) or modeType, 136, 24, function()
+    local button = makeButton(parent, modeType, 136, 24, function()
       profile.modeType = modeType
       self:SaveProfile(profile)
     end)
+    styleButton(button, selected)
+    addHover(button, selected)
     button:SetPoint("TOPLEFT", x, rowY)
     x = x + 142
     if index == 4 then
@@ -601,12 +882,14 @@ function ConfigUI:BuildEquipmentTab(parent, profile, y)
 
   for _, set in ipairs(sets) do
     local selected = profile.equipment and profile.equipment.enabled and profile.equipment.setName == set.name
-    local button = makeButton(parent, selected and selectedText(set.name) or set.name, 300, 24, function()
+    local button = makeButton(parent, set.name, 300, 24, function()
       profile.equipment.enabled = true
       profile.equipment.setId = set.id
       profile.equipment.setName = set.name
       self:SaveProfile(profile)
     end)
+    styleButton(button, selected)
+    addHover(button, selected)
     button:SetPoint("TOPLEFT", 4, y)
     y = y - 28
   end
@@ -652,7 +935,7 @@ function ConfigUI:BuildTalentsTab(parent, profile, y)
 
   for _, loadout in ipairs(loadouts) do
     local selected = profile.talents and profile.talents.enabled and profile.talents.configName == loadout.name
-    local button = makeButton(parent, selected and selectedText(loadout.name) or loadout.name, 320, 24, function()
+    local button = makeButton(parent, loadout.name, 320, 24, function()
       profile.talents.enabled = true
       profile.talents.configId = loadout.id
       profile.talents.configName = loadout.name
@@ -660,6 +943,8 @@ function ConfigUI:BuildTalentsTab(parent, profile, y)
       profile.specName = ModeShift:GetCurrentSpecName()
       self:SaveProfile(profile)
     end)
+    styleButton(button, selected)
+    addHover(button, selected)
     button:SetPoint("TOPLEFT", 4, y)
     y = y - 28
   end
@@ -699,12 +984,14 @@ function ConfigUI:BuildUITab(parent, profile, y)
 
   for _, layout in ipairs(layouts) do
     local selected = profile.editMode and profile.editMode.enabled and profile.editMode.layoutName == layout.name
-    local button = makeButton(parent, selected and selectedText(layout.name) or layout.name, 320, 24, function()
+    local button = makeButton(parent, layout.name, 320, 24, function()
       profile.editMode.enabled = true
       profile.editMode.layoutId = layout.id
       profile.editMode.layoutName = layout.name
       self:SaveProfile(profile)
     end)
+    styleButton(button, selected)
+    addHover(button, selected)
     button:SetPoint("TOPLEFT", 4, y)
     y = y - 28
   end
@@ -814,15 +1101,27 @@ function ConfigUI:BuildAddonProfilePicker(parent, profile, addonName, y)
 
   local entry = profile.addonProfiles.entries[addonName] or { enabled = false, profileName = nil }
   local hasSavedProfile = entry.enabled and entry.profileName and entry.profileName ~= ""
-  if not hasSavedProfile and not (ModeShift.AddonProfileManager and ModeShift.AddonProfileManager:CanShowProfilePicker(addonName)) then
+  local canPickProfile = ModeShift.AddonProfileManager and ModeShift.AddonProfileManager:CanShowProfilePicker(addonName)
+  if not hasSavedProfile and not canPickProfile then
     return y
   end
 
-  local selected = hasSavedProfile and ("Perfil: " .. entry.profileName) or "Elegir perfil"
+  local currentProfile = nil
+  if not hasSavedProfile and ModeShift.AddonProfileManager then
+    currentProfile = ModeShift.AddonProfileManager:GetCurrentProfile(addonName, true)
+  end
+  local text = "Elegir perfil"
+  if hasSavedProfile then
+    text = "Perfil: " .. entry.profileName
+  elseif currentProfile then
+    text = "Actual: " .. currentProfile
+  end
 
-  local currentButton = makeButton(parent, selected, 220, 22, function(button)
+  local currentButton = makeButton(parent, text, 220, 22, function(button)
     self:OpenAddonProfileDropdown(button, profile, addonName)
   end)
+  styleButton(currentButton, hasSavedProfile or currentProfile ~= nil)
+  addHover(currentButton, hasSavedProfile or currentProfile ~= nil)
   currentButton:SetPoint("TOPLEFT", 320, y)
 
   return y
@@ -856,18 +1155,22 @@ end
 
 function ConfigUI:OpenAddonProfileDropdown(anchor, profile, addonName)
   raiseFrame(self.frame)
+  if ModeShift.AddonProfileManager then
+    ModeShift.AddonProfileManager:ClearCache(addonName)
+  end
   local profiles = ModeShift.AddonProfileManager and ModeShift.AddonProfileManager:GetAvailableProfiles(addonName, true) or {}
   local currentProfile = ModeShift.AddonProfileManager and ModeShift.AddonProfileManager:GetCurrentProfile(addonName, true) or nil
 
   local entry = profile.addonProfiles and profile.addonProfiles.entries and profile.addonProfiles.entries[addonName] or nil
   local selected = entry and entry.profileName or nil
+  local effectiveSelected = selected or currentProfile
   local items = {}
   local seen = {}
 
   if currentProfile then
     table.insert(items, {
-      text = "Usar actual: " .. currentProfile,
-      selected = selected == currentProfile,
+      text = "Actual: " .. currentProfile,
+      selected = effectiveSelected == currentProfile,
       onClick = function()
         self:SetAddonProfile(profile, addonName, currentProfile)
       end,
@@ -880,7 +1183,7 @@ function ConfigUI:OpenAddonProfileDropdown(anchor, profile, addonName)
     if not seen[profileValue] then
       table.insert(items, {
         text = profileValue,
-        selected = selected == profileValue,
+        selected = effectiveSelected == profileValue,
         onClick = function()
           self:SetAddonProfile(profile, addonName, profileValue)
         end,
@@ -901,7 +1204,7 @@ function ConfigUI:OpenAddonProfileDropdown(anchor, profile, addonName)
     end,
   })
 
-  self:OpenDropdown(anchor, addonName, items, 280)
+  self:OpenDropdown(anchor, addonName, items, 320)
 end
 
 function ConfigUI:BuildAddonOptionPicker(parent, profile, addonName, y)
@@ -912,11 +1215,20 @@ function ConfigUI:BuildAddonOptionPicker(parent, profile, addonName, y)
   profile.addonProfiles = profile.addonProfiles or { enabled = false, entries = {} }
   profile.addonProfiles.entries = profile.addonProfiles.entries or {}
   local entry = profile.addonProfiles.entries[addonName] or { enabled = false, profileName = nil, optionName = nil }
-  local selected = entry.optionName or "Config..."
+  local currentOption = nil
+  if not entry.optionName and ModeShift.AddonProfileManager then
+    currentOption = ModeShift.AddonProfileManager:GetCurrentOption(addonName, true)
+  end
+  local defaultText = isCooldownManagerAddon(addonName) and "Perfiles CMC" or "Config..."
+  local selectedPrefix = isCooldownManagerAddon(addonName) and "Perfil CMC: " or "Config: "
+  local currentPrefix = isCooldownManagerAddon(addonName) and "Actual CMC: " or "Actual: "
+  local selected = entry.optionName and (selectedPrefix .. entry.optionName) or (currentOption and (currentPrefix .. currentOption) or defaultText)
 
-  local button = makeButton(parent, selected, 110, 22, function(anchor)
+  local button = makeButton(parent, selected, 150, 22, function(anchor)
     self:OpenAddonOptionDropdown(anchor, profile, addonName)
   end)
+  styleButton(button, entry.optionName ~= nil or currentOption ~= nil)
+  addHover(button, entry.optionName ~= nil or currentOption ~= nil)
   button:SetPoint("TOPLEFT", 560, y)
 end
 
@@ -937,18 +1249,22 @@ end
 
 function ConfigUI:OpenAddonOptionDropdown(anchor, profile, addonName)
   raiseFrame(self.frame)
+  if ModeShift.AddonProfileManager then
+    ModeShift.AddonProfileManager:ClearCache(addonName)
+  end
   local options = ModeShift.AddonProfileManager and ModeShift.AddonProfileManager:GetAvailableOptions(addonName, true) or {}
   local currentOption = ModeShift.AddonProfileManager and ModeShift.AddonProfileManager:GetCurrentOption(addonName, true) or nil
 
   local entry = profile.addonProfiles and profile.addonProfiles.entries and profile.addonProfiles.entries[addonName] or nil
   local selected = entry and entry.optionName or nil
+  local effectiveSelected = selected or currentOption
   local items = {}
   local seen = {}
 
   if currentOption then
     table.insert(items, {
-      text = "Usar actual: " .. currentOption,
-      selected = selected == currentOption,
+      text = (isCooldownManagerAddon(addonName) and "Actual CMC: " or "Actual: ") .. currentOption,
+      selected = effectiveSelected == currentOption,
       onClick = function()
         self:SetAddonOption(profile, addonName, currentOption)
       end,
@@ -961,7 +1277,7 @@ function ConfigUI:OpenAddonOptionDropdown(anchor, profile, addonName)
     if not seen[optionValue] then
       table.insert(items, {
         text = optionValue,
-        selected = selected == optionValue,
+        selected = effectiveSelected == optionValue,
         onClick = function()
           self:SetAddonOption(profile, addonName, optionValue)
         end,
@@ -982,7 +1298,8 @@ function ConfigUI:OpenAddonOptionDropdown(anchor, profile, addonName)
     end,
   })
 
-  self:OpenDropdown(anchor, addonName .. " config", items, 280)
+  local title = isCooldownManagerAddon(addonName) and (addonName .. " perfiles") or (addonName .. " config")
+  self:OpenDropdown(anchor, title, items, 320)
 end
 
 function ConfigUI:BuildCVarsTab(parent, profile, y)
