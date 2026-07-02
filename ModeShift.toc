@@ -17,8 +17,10 @@ Database.lua
 ProfileManager.lua
 EquipmentManager.lua
 TalentManager.lua
+EditModeManager.lua
 AddonManager.lua
 ApplyEngine.lua
+ConfigUI.lua
 QuickMenu.lua
 Minimap.lua
 SlashCommands.lua

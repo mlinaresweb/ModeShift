@@ -131,6 +131,11 @@ function ModeShift:ReloadUI()
 end
 
 function ModeShift:OpenConfig()
+  if self.ConfigUI then
+    self.ConfigUI:Toggle()
+    return
+  end
+
   if self.ConfigFrame and self.ConfigFrame:IsShown() then
     self.ConfigFrame:Hide()
     return
@@ -199,6 +204,11 @@ function ModeShift:OpenConfig()
 end
 
 function ModeShift:RefreshConfig()
+  if self.ConfigUI then
+    self.ConfigUI:Refresh()
+    return
+  end
+
   if not self.ConfigFrame or not self.ProfileManager then
     return
   end

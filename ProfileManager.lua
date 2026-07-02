@@ -15,6 +15,19 @@ local function normalizeProfile(profile)
   return profile
 end
 
+function ProfileManager:GenerateProfileId(name, specId, modeType)
+  local base = ModeShift.Utils:MakeProfileId(name, specId, modeType)
+  local profileId = base
+  local index = 2
+
+  while ModeShift.Database:GetProfile(profileId) do
+    profileId = base .. "_" .. index
+    index = index + 1
+  end
+
+  return profileId
+end
+
 function ProfileManager:CreateProfile(data)
   data = data or {}
 
@@ -22,7 +35,7 @@ function ProfileManager:CreateProfile(data)
   local specName = data.specName or ModeShift:GetCurrentSpecName()
   local modeType = data.modeType or ModeShift.Constants.MODE_TYPES.CUSTOM
   local name = data.name or ((specName or "Current Spec") .. " " .. modeType)
-  local profileId = data.id or ModeShift.Utils:MakeProfileId(name, specId, modeType)
+  local profileId = data.id or self:GenerateProfileId(name, specId, modeType)
 
   local profile = normalizeProfile({
     id = profileId,
@@ -48,6 +61,66 @@ function ProfileManager:CreateProfile(data)
   if specId and not ModeShift.Database:GetPreferredProfileForSpec(specId) then
     ModeShift.Database:SetPreferredProfileForSpec(specId, profile.id)
   end
+
+  return profile
+end
+
+function ProfileManager:SaveProfile(profile)
+  if type(profile) ~= "table" or not profile.id then
+    return nil
+  end
+
+  normalizeProfile(profile)
+  ModeShift.Database:SaveProfile(profile)
+  return profile
+end
+
+function ProfileManager:DeleteProfile(profileId)
+  if not profileId then
+    return false
+  end
+
+  ModeShift.Database:DeleteProfile(profileId)
+  if ModeShift.Database:GetActiveProfileId() == profileId then
+    ModeShift.Database:SetActiveProfileId(nil)
+  end
+  if ModeShift.Database:GetLastAppliedProfileId() == profileId then
+    ModeShift.Database:SetLastAppliedProfileId(nil)
+  end
+  if ModeShift.Database:GetPendingProfileId() == profileId then
+    ModeShift.Database:SetPendingProfileId(nil)
+  end
+
+  return true
+end
+
+function ProfileManager:DuplicateProfile(profileId)
+  local source = self:GetProfile(profileId)
+  if not source then
+    return nil
+  end
+
+  local copy = ModeShift.Utils:DeepCopy(source)
+  copy.name = (copy.name or "Perfil") .. " copia"
+  copy.id = self:GenerateProfileId(copy.name, copy.specId, copy.modeType)
+  copy.order = (copy.order or 100) + 1
+  return self:SaveProfile(copy)
+end
+
+function ProfileManager:CreateProfileFromCurrentState(name, modeType)
+  local specId = ModeShift:GetCurrentSpecId()
+  local specName = ModeShift:GetCurrentSpecName()
+  local profile = self:CreateProfile({
+    name = name or ((specName or "Spec") .. " " .. (modeType or "CUSTOM")),
+    specId = specId,
+    specName = specName,
+    classFile = ModeShift:GetClassFile(),
+    modeType = modeType or "CUSTOM",
+    equipment = { enabled = false, setName = nil, setId = nil },
+    talents = { enabled = false, configName = nil, configId = nil, autoApply = true },
+    addons = { enabled = true, enable = {}, disable = {} },
+    cvars = { enabled = false, values = {} },
+  })
 
   return profile
 end

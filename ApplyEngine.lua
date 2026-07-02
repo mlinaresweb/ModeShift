@@ -75,13 +75,12 @@ function ApplyEngine:ApplyAddonProfiles(profile, result)
 end
 
 function ApplyEngine:ApplyEditMode(profile, result)
-  local editMode = profile and profile.editMode or nil
-  if not editMode or not editMode.enabled then
-    table.insert(result.skipped, "Edit Mode desactivado")
+  if not ModeShift.EditModeManager then
+    table.insert(result.warnings, "EditModeManager no esta disponible")
     return
   end
 
-  table.insert(result.warnings, "Edit Mode se implementara en Fase 3")
+  self:MergeResult(result, ModeShift.EditModeManager:Apply(profile))
 end
 
 function ApplyEngine:ApplyProfile(profileId, options)
