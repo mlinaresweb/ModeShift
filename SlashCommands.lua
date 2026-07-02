@@ -131,7 +131,7 @@ function SlashCommands:HandleAddon(args)
   local profile = profileId and ModeShift.ProfileManager:GetProfile(profileId)
 
   if not profile or not addonName or addonName == "" then
-    ModeShift:Print("uso: /ms addon <profileId> enable|disable|ignore <addonName>")
+    ModeShift:Print("uso: /ms addon <profileId> enable|disable <addonName>")
     return
   end
 
@@ -139,23 +139,18 @@ function SlashCommands:HandleAddon(args)
   profile.addons.enable = ModeShift.Utils:SafeArray(profile.addons.enable)
   profile.addons.disable = ModeShift.Utils:SafeArray(profile.addons.disable)
 
-  if action == "enable" then
+  if action == "enable" or action == "load" then
     removeValue(profile.addons.disable, addonName)
     addUnique(profile.addons.enable, addonName)
     ModeShift.Database:SaveProfile(profile)
     ModeShift:Print(addonName .. " se activara en " .. profile.id)
-  elseif action == "disable" then
+  elseif action == "disable" or action == "unload" then
     removeValue(profile.addons.enable, addonName)
     addUnique(profile.addons.disable, addonName)
     ModeShift.Database:SaveProfile(profile)
     ModeShift:Print(addonName .. " se desactivara en " .. profile.id)
-  elseif action == "ignore" then
-    removeValue(profile.addons.enable, addonName)
-    removeValue(profile.addons.disable, addonName)
-    ModeShift.Database:SaveProfile(profile)
-    ModeShift:Print(addonName .. " queda ignorado en " .. profile.id)
   else
-    ModeShift:Print("uso: /ms addon <profileId> enable|disable|ignore <addonName>")
+    ModeShift:Print("uso: /ms addon <profileId> enable|disable <addonName>")
   end
 end
 
@@ -185,7 +180,7 @@ function SlashCommands:Help()
   ModeShift:Print("/ms create - crear perfiles de ejemplo")
   ModeShift:Print("/ms set equipment <profileId> <nombre> - asignar set")
   ModeShift:Print("/ms set talents <profileId> <nombre> - asignar loadout")
-  ModeShift:Print("/ms addon <profileId> enable|disable|ignore <addonName> - configurar addon")
+  ModeShift:Print("/ms addon <profileId> enable|disable <addonName> - configurar addon")
   ModeShift:Print("/ms addons - listar addons instalados")
   ModeShift:Print("/ms doctor - diagnostico rapido")
   ModeShift:Print("/ms reload - recargar interfaz")

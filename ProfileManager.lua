@@ -122,6 +122,50 @@ function ProfileManager:CreateProfileFromCurrentState(name, modeType)
     cvars = { enabled = false, values = {} },
   })
 
+  self:CaptureCurrentAddons(profile)
+  self:SaveProfile(profile)
+
+  return profile
+end
+
+function ProfileManager:CaptureCurrentAddons(profile)
+  if type(profile) ~= "table" or not ModeShift.AddonManager then
+    return profile
+  end
+
+  profile.addons = ModeShift.Utils:CopyDefaults(profile.addons, { enabled = true, enable = {}, disable = {} })
+  profile.addons.enabled = true
+  profile.addons.enable = {}
+  profile.addons.disable = {}
+
+  for _, addon in ipairs(ModeShift.AddonManager:GetInstalledAddons()) do
+    if addon.name == ModeShift.addonName then
+      table.insert(profile.addons.enable, addon.name)
+    elseif addon.enabled then
+      table.insert(profile.addons.enable, addon.name)
+    else
+      table.insert(profile.addons.disable, addon.name)
+    end
+  end
+
+  return profile
+end
+
+function ProfileManager:EnsureAddonSnapshot(profile)
+  if type(profile) ~= "table" then
+    return profile
+  end
+
+  profile.addons = ModeShift.Utils:CopyDefaults(profile.addons, { enabled = true, enable = {}, disable = {} })
+  profile.addons.enabled = true
+  profile.addons.enable = ModeShift.Utils:SafeArray(profile.addons.enable)
+  profile.addons.disable = ModeShift.Utils:SafeArray(profile.addons.disable)
+
+  if #profile.addons.enable == 0 and #profile.addons.disable == 0 then
+    self:CaptureCurrentAddons(profile)
+    self:SaveProfile(profile)
+  end
+
   return profile
 end
 
@@ -151,6 +195,9 @@ function ProfileManager:EnsureExampleProfiles()
       addons = { enabled = true, enable = {}, disable = {} },
       cvars = { enabled = false, values = {} },
     })
+    local profile = ModeShift.Database:GetProfile(pveId)
+    self:CaptureCurrentAddons(profile)
+    self:SaveProfile(profile)
   end
 
   if not ModeShift.Database:GetProfile(pvpId) then
@@ -168,6 +215,9 @@ function ProfileManager:EnsureExampleProfiles()
       addons = { enabled = true, enable = {}, disable = {} },
       cvars = { enabled = false, values = {} },
     })
+    local profile = ModeShift.Database:GetProfile(pvpId)
+    self:CaptureCurrentAddons(profile)
+    self:SaveProfile(profile)
   end
 end
 

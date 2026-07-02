@@ -25,42 +25,6 @@ local MODE_TYPES = {
   "CUSTOM",
 }
 
-local function contains(list, value)
-  if type(list) ~= "table" then
-    return false
-  end
-
-  for _, current in ipairs(list) do
-    if current == value then
-      return true
-    end
-  end
-
-  return false
-end
-
-local function removeValue(list, value)
-  if type(list) ~= "table" then
-    return
-  end
-
-  for index = #list, 1, -1 do
-    if list[index] == value then
-      table.remove(list, index)
-    end
-  end
-end
-
-local function addUnique(list, value)
-  if type(list) ~= "table" or not value or value == "" then
-    return
-  end
-
-  if not contains(list, value) then
-    table.insert(list, value)
-  end
-end
-
 local function makeButton(parent, text, width, height, onClick)
   local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
   button:SetSize(width or 120, height or 24)
@@ -660,35 +624,10 @@ function ConfigUI:BuildUITab(parent, profile, y)
   return y
 end
 
-function ConfigUI:SetAddonState(profile, addonName, state)
-  profile.addons.enabled = true
-  profile.addons.enable = ModeShift.Utils:SafeArray(profile.addons.enable)
-  profile.addons.disable = ModeShift.Utils:SafeArray(profile.addons.disable)
-  removeValue(profile.addons.enable, addonName)
-  removeValue(profile.addons.disable, addonName)
-
-  if state == "enable" then
-    addUnique(profile.addons.enable, addonName)
-  elseif state == "disable" then
-    addUnique(profile.addons.disable, addonName)
-  end
-
-  self:SaveProfile(profile)
-end
-
-function ConfigUI:GetAddonState(profile, addonName)
-  if contains(profile.addons.enable, addonName) then
-    return "enable"
-  end
-  if contains(profile.addons.disable, addonName) then
-    return "disable"
-  end
-  return "ignore"
-end
-
 function ConfigUI:BuildAddonsTab(parent, profile, y)
   y = self:AddSection(parent, "Addons y perfiles internos", y)
-  y = self:AddDescription(parent, "Click en Estado para alternar Ignorar, Activar y Desactivar. Los perfiles internos aparecen solo para addons soportados.", y)
+  y = self:AddDescription(parent, "Marca los addons que deben cargarse en este perfil. Los no marcados se desactivaran al aplicar el perfil. Si hay perfiles internos, puedes elegirlos a la derecha.", y)
+  ModeShift.ProfileManager:EnsureAddonSnapshot(profile)
 
   local enabledCheck = makeCheck(parent, "Gestionar addons en este perfil", profile.addons and profile.addons.enabled, function(checked)
     profile.addons.enabled = checked
@@ -697,11 +636,22 @@ function ConfigUI:BuildAddonsTab(parent, profile, y)
   enabledCheck:SetPoint("TOPLEFT", 0, y + 4)
   y = y - 34
 
+  local snapshotText = makeText(parent, "Estado inicial capturado automaticamente al crear el perfil.", "GameFontDisableSmall")
+  snapshotText:SetPoint("TOPLEFT", 4, y)
+  snapshotText:SetWidth(300)
+
+  local captureButton = makeButton(parent, "Actualizar desde estado actual", 190, 22, function()
+    ModeShift.ProfileManager:CaptureCurrentAddons(profile)
+    self:SaveProfile(profile)
+  end)
+  captureButton:SetPoint("TOPLEFT", 320, y + 5)
+  y = y - 38
+
   local addons = ModeShift.AddonManager:GetInstalledAddons()
   for _, addon in ipairs(addons) do
     addon.modeShiftProfiles = ModeShift.AddonProfileManager and ModeShift.AddonProfileManager:GetAvailableProfiles(addon.name) or {}
     addon.modeShiftProfileCount = #addon.modeShiftProfiles
-    addon.modeShiftSelected = self:GetAddonState(profile, addon.name) ~= "ignore"
+    addon.modeShiftSelected = ModeShift.AddonManager:ShouldLoadInProfile(profile, addon)
   end
   table.sort(addons, function(a, b)
     if a.modeShiftSelected ~= b.modeShiftSelected then
@@ -726,47 +676,38 @@ function ConfigUI:BuildAddonsTab(parent, profile, y)
   y = y - 36
 
   local header = makeText(parent, "Addon", "GameFontNormalSmall")
-  header:SetPoint("TOPLEFT", 4, y)
+  header:SetPoint("TOPLEFT", 30, y)
   header:SetWidth(190)
-  local stateHeader = makeText(parent, "Estado", "GameFontNormalSmall")
-  stateHeader:SetPoint("TOPLEFT", 205, y)
-  stateHeader:SetWidth(90)
+  local stateHeader = makeText(parent, "Cargar", "GameFontNormalSmall")
+  stateHeader:SetPoint("TOPLEFT", 4, y)
+  stateHeader:SetWidth(55)
   local profileHeader = makeText(parent, "Perfil interno", "GameFontNormalSmall")
   profileHeader:SetPoint("TOPLEFT", 320, y)
   profileHeader:SetWidth(200)
   y = y - 22
 
   for _, addon in ipairs(addons) do
-    local state = self:GetAddonState(profile, addon.name)
     local installedState = addon.enabled and "cargado/activo" or "desactivado"
+    local shouldLoad = ModeShift.AddonManager:ShouldLoadInProfile(profile, addon)
+
+    local loadCheck = makeCheck(parent, "", shouldLoad, function(checked)
+      ModeShift.AddonManager:SetProfileAddonState(profile, addon.name, checked)
+      self:SaveProfile(profile)
+    end)
+    loadCheck:SetPoint("TOPLEFT", 0, y + 3)
+    if addon.name == ModeShift.addonName then
+      loadCheck:Disable()
+    end
+
     local label = makeText(parent, addon.name)
-    label:SetPoint("TOPLEFT", 4, y - 2)
+    label:SetPoint("TOPLEFT", 30, y - 2)
     label:SetWidth(190)
     if label.SetWordWrap then
       label:SetWordWrap(false)
     end
 
-    local stateText = "Ignorar"
-    if state == "enable" then
-      stateText = "Activar"
-    elseif state == "disable" then
-      stateText = "Desactivar"
-    end
-
-    local stateButton = makeButton(parent, stateText, 96, 22, function()
-      local current = self:GetAddonState(profile, addon.name)
-      local nextState = "enable"
-      if current == "enable" then
-        nextState = "disable"
-      elseif current == "disable" then
-        nextState = "ignore"
-      end
-      self:SetAddonState(profile, addon.name, nextState)
-    end)
-    stateButton:SetPoint("TOPLEFT", 205, y)
-
     local details = makeText(parent, installedState, "GameFontDisableSmall")
-    details:SetPoint("TOPLEFT", 4, y - 16)
+    details:SetPoint("TOPLEFT", 30, y - 16)
     details:SetWidth(190)
 
     y = self:BuildAddonProfilePicker(parent, profile, addon.name, y)

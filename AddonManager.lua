@@ -57,6 +57,10 @@ function AddonManager:IsEnabled(addonName)
 end
 
 function AddonManager:SetEnabled(addonName, enabled)
+  if addonName == ModeShift.addonName and not enabled then
+    return false, "ModeShift no puede desactivarse a si mismo"
+  end
+
   local api = addonApi()
   local character = UnitName and UnitName("player") or nil
 
@@ -77,6 +81,58 @@ function AddonManager:SetEnabled(addonName, enabled)
   end
 
   return false, "La API de addons no esta disponible"
+end
+
+function AddonManager:SetProfileAddonState(profile, addonName, shouldLoad)
+  if type(profile) ~= "table" or not addonName or addonName == "" then
+    return
+  end
+
+  profile.addons = ModeShift.Utils:CopyDefaults(profile.addons, { enabled = true, enable = {}, disable = {} })
+  profile.addons.enabled = true
+  profile.addons.enable = ModeShift.Utils:SafeArray(profile.addons.enable)
+  profile.addons.disable = ModeShift.Utils:SafeArray(profile.addons.disable)
+
+  for index = #profile.addons.enable, 1, -1 do
+    if profile.addons.enable[index] == addonName then
+      table.remove(profile.addons.enable, index)
+    end
+  end
+  for index = #profile.addons.disable, 1, -1 do
+    if profile.addons.disable[index] == addonName then
+      table.remove(profile.addons.disable, index)
+    end
+  end
+
+  if addonName == ModeShift.addonName then
+    shouldLoad = true
+  end
+
+  if shouldLoad then
+    table.insert(profile.addons.enable, addonName)
+  else
+    table.insert(profile.addons.disable, addonName)
+  end
+end
+
+function AddonManager:ShouldLoadInProfile(profile, addon)
+  local addonName = type(addon) == "table" and addon.name or addon
+  local addons = profile and profile.addons or nil
+
+  if addonName == ModeShift.addonName then
+    return true
+  end
+
+  if not addons then
+    return false
+  end
+
+  for _, name in ipairs(ModeShift.Utils:SafeArray(addons.enable)) do
+    if name == addonName then
+      return true
+    end
+  end
+  return false
 end
 
 function AddonManager:GetInstalledAddons()
@@ -111,38 +167,27 @@ function AddonManager:Apply(profile)
   end
 
   local changed = {}
-
-  for _, addonName in ipairs(ModeShift.Utils:SafeArray(addons.enable)) do
-    if addonName and addonName ~= "" then
-      if not self:IsInstalled(addonName) then
-        table.insert(result.warnings, "Addon no instalado: " .. addonName)
-      elseif self:IsEnabled(addonName) then
-        table.insert(result.skipped, "Addon ya activo: " .. addonName)
-      else
-        local ok, err = self:SetEnabled(addonName, true)
+  local installed = self:GetInstalledAddons()
+  for _, addon in ipairs(installed) do
+    local shouldLoad = self:ShouldLoadInProfile(profile, addon)
+    if shouldLoad then
+      if not self:IsEnabled(addon.name) then
+        local ok, err = self:SetEnabled(addon.name, true)
         if ok then
-          table.insert(changed, "+" .. addonName)
+          table.insert(changed, "+" .. addon.name)
         else
           result.success = false
-          table.insert(result.errors, "No se pudo activar " .. addonName .. ": " .. tostring(err))
+          table.insert(result.errors, "No se pudo activar " .. addon.name .. ": " .. tostring(err))
         end
       end
-    end
-  end
-
-  for _, addonName in ipairs(ModeShift.Utils:SafeArray(addons.disable)) do
-    if addonName and addonName ~= "" then
-      if not self:IsInstalled(addonName) then
-        table.insert(result.warnings, "Addon no instalado: " .. addonName)
-      elseif not self:IsEnabled(addonName) then
-        table.insert(result.skipped, "Addon ya desactivado: " .. addonName)
-      else
-        local ok, err = self:SetEnabled(addonName, false)
+    else
+      if self:IsEnabled(addon.name) then
+        local ok, err = self:SetEnabled(addon.name, false)
         if ok then
-          table.insert(changed, "-" .. addonName)
+          table.insert(changed, "-" .. addon.name)
         else
           result.success = false
-          table.insert(result.errors, "No se pudo desactivar " .. addonName .. ": " .. tostring(err))
+          table.insert(result.errors, "No se pudo desactivar " .. addon.name .. ": " .. tostring(err))
         end
       end
     end
