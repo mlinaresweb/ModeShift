@@ -22,6 +22,8 @@ AddonManager.lua
 Integrations\Integrations.lua
 Integrations\ElvUI.lua
 Integrations\Bartender4.lua
+Integrations\Bagnator.lua
+Integrations\Baganator.lua
 Integrations\Plater.lua
 Integrations\Details.lua
 Integrations\OmniCD.lua

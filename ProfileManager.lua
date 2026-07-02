@@ -148,6 +148,31 @@ function ProfileManager:CaptureCurrentAddons(profile)
     end
   end
 
+  self:CaptureCurrentAddonProfiles(profile)
+
+  return profile
+end
+
+function ProfileManager:CaptureCurrentAddonProfiles(profile)
+  if type(profile) ~= "table" or not ModeShift.AddonProfileManager or not ModeShift.AddonManager then
+    return profile
+  end
+
+  profile.addonProfiles = ModeShift.Utils:CopyDefaults(profile.addonProfiles, { enabled = true, entries = {} })
+  profile.addonProfiles.enabled = true
+  profile.addonProfiles.entries = profile.addonProfiles.entries or {}
+
+  for _, addon in ipairs(ModeShift.AddonManager:GetInstalledAddons()) do
+    local currentProfile = ModeShift.AddonProfileManager:GetCurrentProfile(addon.name)
+    local profiles = ModeShift.AddonProfileManager:GetAvailableProfiles(addon.name)
+    if currentProfile or #profiles > 0 then
+      profile.addonProfiles.entries[addon.name] = {
+        enabled = currentProfile ~= nil,
+        profileName = currentProfile,
+      }
+    end
+  end
+
   return profile
 end
 

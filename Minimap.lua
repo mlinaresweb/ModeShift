@@ -18,7 +18,7 @@ end
 
 local function updatePosition(button)
   local angle = math.rad(getAngle())
-  local radius = 82
+  local radius = ((Minimap:GetWidth() or 140) / 2) + 12
   local x = math.cos(angle) * radius
   local y = math.sin(angle) * radius
   button:ClearAllPoints()
@@ -61,8 +61,9 @@ function MinimapModule:Initialize()
   end
 
   local button = CreateFrame("Button", "ModeShiftMinimapButton", Minimap)
-  button:SetSize(31, 31)
-  button:SetFrameStrata("MEDIUM")
+  button:SetSize(32, 32)
+  button:SetFrameStrata("HIGH")
+  button:SetFrameLevel((Minimap:GetFrameLevel() or 0) + 8)
   updatePosition(button)
   button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   button:RegisterForDrag("LeftButton")
@@ -91,13 +92,13 @@ function MinimapModule:Initialize()
 
   button.icon = button:CreateTexture(nil, "BACKGROUND")
   button.icon:SetTexture(ModeShift.Constants.DEFAULT_ICON)
-  button.icon:SetSize(20, 20)
-  button.icon:SetPoint("CENTER")
+  button.icon:SetSize(19, 19)
+  button.icon:SetPoint("CENTER", 0, 0)
 
   button.border = button:CreateTexture(nil, "OVERLAY")
   button.border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
   button.border:SetSize(52, 52)
-  button.border:SetPoint("TOPLEFT")
+  button.border:SetPoint("TOPLEFT", -9, 9)
 
   self.button = button
 end

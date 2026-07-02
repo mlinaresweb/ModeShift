@@ -149,7 +149,7 @@ function AddonManager:GetInstalledAddons()
 
   for index = 1, count do
     local ok, name, title = getAddOnInfo(index)
-    if ok and name then
+    if ok and name and name ~= ModeShift.addonName then
       table.insert(addons, { name = name, title = title or name, enabled = self:IsEnabled(name) })
     end
   end

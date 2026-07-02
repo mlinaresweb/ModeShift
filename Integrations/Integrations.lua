@@ -25,6 +25,10 @@ local function splitCSV(value)
   return list
 end
 
+local function normalizeName(value)
+  return tostring(value or ""):lower():gsub("[^%w]", "")
+end
+
 function Integrations:IsAddonLoaded(addonName)
   local api = addonApi()
   if api.IsAddOnLoaded then
@@ -96,6 +100,9 @@ function Integrations:GetProfilesFromDB(db)
   if type(source) ~= "table" and type(db.global) == "table" then
     source = db.global.profiles
   end
+  if type(source) ~= "table" and type(db.profile) == "table" then
+    source = db.profile.profiles
+  end
 
   if type(source) == "table" then
     for profileName in pairs(source) do
@@ -105,6 +112,29 @@ function Integrations:GetProfilesFromDB(db)
 
   table.sort(profiles)
   return profiles
+end
+
+function Integrations:GetCurrentProfileFromDB(db)
+  if type(db) ~= "table" then
+    return nil
+  end
+
+  if type(db.profileKeys) == "table" then
+    local key = ModeShift:GetPlayerKey()
+    if db.profileKeys[key] then
+      return tostring(db.profileKeys[key])
+    end
+  end
+
+  if type(db.global) == "table" and db.global.currentProfile then
+    return tostring(db.global.currentProfile)
+  end
+
+  if db.currentProfile then
+    return tostring(db.currentProfile)
+  end
+
+  return nil
 end
 
 function Integrations:GetProfilesFromAceDB(dbObject)
@@ -121,6 +151,21 @@ function Integrations:GetProfilesFromAceDB(dbObject)
   end
 
   return self:GetProfilesFromDB(dbObject.sv or dbObject)
+end
+
+function Integrations:GetCurrentProfileFromAceDB(dbObject)
+  if type(dbObject) ~= "table" then
+    return nil
+  end
+
+  if type(dbObject.GetCurrentProfile) == "function" then
+    local ok, profileName = ModeShift:SafeCall("GetCurrentProfile", dbObject.GetCurrentProfile, dbObject)
+    if ok and profileName then
+      return tostring(profileName)
+    end
+  end
+
+  return self:GetCurrentProfileFromDB(dbObject.sv or dbObject)
 end
 
 function Integrations:ApplyAceDBProfile(dbObject, profileName)
@@ -155,6 +200,11 @@ function Integrations:GetGenericProfileSource(addonName)
   end
 
   local savedVariables = splitCSV(self:GetAddonMetadata(addonName, "SavedVariables"))
+  local perCharacter = splitCSV(self:GetAddonMetadata(addonName, "SavedVariablesPerCharacter"))
+  for _, variableName in ipairs(perCharacter) do
+    table.insert(savedVariables, variableName)
+  end
+
   for _, variableName in ipairs(savedVariables) do
     local db = _G[variableName]
     local profiles = self:GetProfilesFromDB(db)
@@ -176,6 +226,19 @@ function Integrations:GetGenericProfileSource(addonName)
     end
   end
 
+  local normalizedAddon = normalizeName(addonName)
+  for variableName, db in pairs(_G) do
+    if type(variableName) == "string" and type(db) == "table" then
+      local normalizedVariable = normalizeName(variableName)
+      if normalizedVariable:find(normalizedAddon, 1, true) then
+        local profiles = self:GetProfilesFromDB(db)
+        if #profiles > 0 then
+          return db, variableName
+        end
+      end
+    end
+  end
+
   return nil, nil
 end
 
@@ -185,6 +248,14 @@ function Integrations:GetGenericProfiles(addonName)
     return {}
   end
   return self:GetProfilesFromAceDB(source)
+end
+
+function Integrations:GetGenericCurrentProfile(addonName)
+  local source = self:GetGenericProfileSource(addonName)
+  if not source then
+    return nil
+  end
+  return self:GetCurrentProfileFromAceDB(source)
 end
 
 function Integrations:ApplyGenericProfile(addonName, profileName)

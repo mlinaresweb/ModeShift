@@ -16,6 +16,13 @@ ModeShift.Integrations:Register({
     end
     return ModeShift.Integrations:GetProfilesFromDB(_G.PlaterDB)
   end,
+  getCurrentProfile = function()
+    local addon = _G.Plater
+    if addon and addon.db then
+      return ModeShift.Integrations:GetCurrentProfileFromAceDB(addon.db)
+    end
+    return ModeShift.Integrations:GetCurrentProfileFromDB(_G.PlaterDB)
+  end,
   applyProfile = function(profileName)
     local addon = _G.Plater
     if addon and addon.db then

@@ -16,6 +16,13 @@ ModeShift.Integrations:Register({
     end
     return ModeShift.Integrations:GetProfilesFromDB(_G.ElvDB)
   end,
+  getCurrentProfile = function()
+    local E = _G.ElvUI and _G.ElvUI[1]
+    if E and E.data then
+      return ModeShift.Integrations:GetCurrentProfileFromAceDB(E.data)
+    end
+    return ModeShift.Integrations:GetCurrentProfileFromDB(_G.ElvDB)
+  end,
   applyProfile = function(profileName)
     local E = _G.ElvUI and _G.ElvUI[1]
     if E and E.data then

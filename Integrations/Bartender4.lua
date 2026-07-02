@@ -16,6 +16,13 @@ ModeShift.Integrations:Register({
     end
     return ModeShift.Integrations:GetProfilesFromDB(_G.Bartender4DB)
   end,
+  getCurrentProfile = function()
+    local addon = _G.Bartender4
+    if addon and addon.db then
+      return ModeShift.Integrations:GetCurrentProfileFromAceDB(addon.db)
+    end
+    return ModeShift.Integrations:GetCurrentProfileFromDB(_G.Bartender4DB)
+  end,
   applyProfile = function(profileName)
     local addon = _G.Bartender4
     if addon and addon.db then

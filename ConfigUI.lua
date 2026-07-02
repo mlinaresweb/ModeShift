@@ -35,6 +35,18 @@ local function makeButton(parent, text, width, height, onClick)
   return button
 end
 
+local function raiseFrame(frame)
+  if not frame then
+    return
+  end
+
+  frame:SetFrameStrata("TOOLTIP")
+  frame:SetFrameLevel(9000)
+  if frame.Raise then
+    frame:Raise()
+  end
+end
+
 local function makeCheck(parent, text, checked, onClick)
   local check = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
   check:SetSize(24, 24)
@@ -125,11 +137,15 @@ function ConfigUI:Initialize()
   local frame = CreateFrame("Frame", "ModeShiftConfigFrame", UIParent, "BasicFrameTemplateWithInset")
   frame:SetSize(930, 650)
   frame:SetPoint("CENTER")
+  raiseFrame(frame)
   frame:SetMovable(true)
   frame:EnableMouse(true)
   frame:RegisterForDrag("LeftButton")
   frame:SetScript("OnDragStart", frame.StartMoving)
   frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+  frame:SetScript("OnMouseDown", function(self)
+    raiseFrame(self)
+  end)
   frame:SetScript("OnHide", function()
     if GameTooltip then
       GameTooltip:Hide()
@@ -214,6 +230,7 @@ function ConfigUI:Open()
   self:Initialize()
   self:EnsureSelection()
   self:Refresh()
+  raiseFrame(self.frame)
   self.frame:Show()
 end
 
@@ -668,7 +685,7 @@ function ConfigUI:BuildAddonsTab(parent, profile, y)
     return y
   end
 
-  local profileCheck = makeCheck(parent, "Gestionar perfiles internos de addons soportados", profile.addonProfiles and profile.addonProfiles.enabled, function(checked)
+  local profileCheck = makeCheck(parent, "Aplicar perfiles internos de addons cuando existan", profile.addonProfiles and profile.addonProfiles.enabled, function(checked)
     profile.addonProfiles.enabled = checked
     self:SaveProfile(profile)
   end)
@@ -723,45 +740,25 @@ function ConfigUI:BuildAddonProfilePicker(parent, profile, addonName, y)
 
   local integration = ModeShift.Integrations and ModeShift.Integrations:Get(addonName)
   local profiles = ModeShift.AddonProfileManager and ModeShift.AddonProfileManager:GetAvailableProfiles(addonName) or {}
-  if not integration and #profiles == 0 then
-    local unsupported = makeText(parent, "sin perfiles soportados", "GameFontDisableSmall")
-    unsupported:SetPoint("TOPLEFT", 320, y + 2)
-    unsupported:SetWidth(220)
+  local currentProfile = ModeShift.AddonProfileManager and ModeShift.AddonProfileManager:GetCurrentProfile(addonName) or nil
+  if not integration and #profiles == 0 and not currentProfile then
     return y
   end
 
   local entry = profile.addonProfiles.entries[addonName] or { enabled = false, profileName = nil }
-  local label = integration and integration.displayName or addonName
-  local selected = entry.enabled and entry.profileName or "No cambiar"
-
-  local currentButton = makeButton(parent, selected, 190, 22, function()
-    if #profiles == 0 then
-      entry.enabled = not entry.enabled
-    elseif not entry.enabled or not entry.profileName then
-      entry.enabled = true
-      entry.profileName = profiles[1]
-    else
-      local nextIndex = nil
-      for index, profileName in ipairs(profiles) do
-        if profileName == entry.profileName then
-          nextIndex = index + 1
-          break
-        end
-      end
-      if not nextIndex or nextIndex > #profiles then
-        entry.enabled = false
-        entry.profileName = nil
-      else
-        entry.profileName = profiles[nextIndex]
-      end
-    end
-
-    if not entry.enabled then
-      entry.profileName = nil
-    end
-    profile.addonProfiles.entries[addonName] = entry
+  if not entry.profileName and currentProfile then
+    entry.enabled = true
+    entry.profileName = currentProfile
     profile.addonProfiles.enabled = true
-    self:SaveProfile(profile)
+    profile.addonProfiles.entries[addonName] = entry
+    ModeShift.ProfileManager:SaveProfile(profile)
+  end
+
+  local label = integration and integration.displayName or addonName
+  local selected = entry.enabled and entry.profileName or currentProfile or "Sin perfil activo"
+
+  local currentButton = makeButton(parent, selected, 190, 22, function(button)
+    self:OpenAddonProfileDropdown(button, profile, addonName, profiles, currentProfile)
   end)
   currentButton:SetPoint("TOPLEFT", 320, y)
 
@@ -771,37 +768,59 @@ function ConfigUI:BuildAddonProfilePicker(parent, profile, addonName, y)
   end)
   clearButton:SetPoint("LEFT", currentButton, "RIGHT", 4, 0)
 
-  if #profiles == 0 then
-    local note = makeText(parent, label .. ": sin lista disponible", "GameFontDisableSmall")
+  if #profiles == 0 and currentProfile then
+    local note = makeText(parent, label .. ": perfil activo detectado", "GameFontDisableSmall")
     note:SetPoint("TOPLEFT", 320, y - 16)
     note:SetWidth(230)
     return y
   end
 
-  local x = 320
-  local rowY = y - 26
-  for index, profileName in ipairs(profiles) do
-    if index <= 2 then
-      local button = makeButton(parent, profileName, 88, 20, function()
-        profile.addonProfiles.enabled = true
-        profile.addonProfiles.entries[addonName] = {
-          enabled = true,
-          profileName = profileName,
-        }
-        self:SaveProfile(profile)
+  local note = makeText(parent, tostring(#profiles) .. " perfiles detectados", "GameFontDisableSmall")
+  note:SetPoint("TOPLEFT", 320, y - 16)
+  note:SetWidth(230)
+
+  return y
+end
+
+function ConfigUI:SetAddonProfile(profile, addonName, profileName)
+  profile.addonProfiles.enabled = true
+  profile.addonProfiles.entries[addonName] = {
+    enabled = profileName ~= nil,
+    profileName = profileName,
+  }
+  self:SaveProfile(profile)
+end
+
+function ConfigUI:OpenAddonProfileDropdown(anchor, profile, addonName, profiles, currentProfile)
+  raiseFrame(self.frame)
+
+  if MenuUtil and MenuUtil.CreateContextMenu then
+    MenuUtil.CreateContextMenu(anchor, function(_, root)
+      root:CreateTitle(addonName)
+      if currentProfile then
+        root:CreateButton("Usar actual: " .. currentProfile, function()
+          self:SetAddonProfile(profile, addonName, currentProfile)
+        end)
+      end
+      for _, profileName in ipairs(profiles or {}) do
+        root:CreateButton(profileName, function()
+          self:SetAddonProfile(profile, addonName, profileName)
+        end)
+      end
+      root:CreateDivider()
+      root:CreateButton("Limpiar seleccion", function()
+        self:SetAddonProfile(profile, addonName, nil)
       end)
-      button:SetPoint("TOPLEFT", x, rowY)
-      x = x + 94
-    end
+    end)
+    return
   end
 
-  if #profiles > 2 then
-    local more = makeText(parent, "+" .. tostring(#profiles - 2) .. " mas", "GameFontDisableSmall")
-    more:SetPoint("TOPLEFT", x, rowY + 3)
-    more:SetWidth(70)
+  local nextProfile = currentProfile or (profiles and profiles[1]) or nil
+  if nextProfile then
+    self:SetAddonProfile(profile, addonName, nextProfile)
+  else
+    self:SetAddonProfile(profile, addonName, nil)
   end
-
-  return y - 24
 end
 
 function ConfigUI:BuildCVarsTab(parent, profile, y)
@@ -985,7 +1004,7 @@ function ConfigUI:ShowImportExport(title, text, canImport)
     local frame = CreateFrame("Frame", "ModeShiftImportExportFrame", UIParent, "BasicFrameTemplateWithInset")
     frame:SetSize(620, 430)
     frame:SetPoint("CENTER")
-    frame:SetFrameStrata("DIALOG")
+    raiseFrame(frame)
     frame:SetMovable(true)
     frame:EnableMouse(true)
     frame:RegisterForDrag("LeftButton")

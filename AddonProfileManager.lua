@@ -28,6 +28,22 @@ function AddonProfileManager:GetAvailableProfiles(addonName)
   return {}
 end
 
+function AddonProfileManager:GetCurrentProfile(addonName)
+  local integration = ModeShift.Integrations and ModeShift.Integrations:Get(addonName)
+  if integration and type(integration.getCurrentProfile) == "function" then
+    local ok, profileName = ModeShift:SafeCall("getCurrentProfile", integration.getCurrentProfile)
+    if ok and profileName then
+      return tostring(profileName)
+    end
+  end
+
+  if ModeShift.Integrations then
+    return ModeShift.Integrations:GetGenericCurrentProfile(addonName)
+  end
+
+  return nil
+end
+
 function AddonProfileManager:CanShowProfilePicker(addonName)
   if ModeShift.Integrations and ModeShift.Integrations:Get(addonName) then
     return true
