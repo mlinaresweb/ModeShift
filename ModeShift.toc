@@ -19,6 +19,17 @@ EquipmentManager.lua
 TalentManager.lua
 EditModeManager.lua
 AddonManager.lua
+Integrations\Integrations.lua
+Integrations\ElvUI.lua
+Integrations\Bartender4.lua
+Integrations\Plater.lua
+Integrations\Details.lua
+Integrations\OmniCD.lua
+Integrations\OmniBar.lua
+Integrations\BigWigs.lua
+Integrations\DBM.lua
+Integrations\WeakAuras.lua
+AddonProfileManager.lua
 ApplyEngine.lua
 ConfigUI.lua
 QuickMenu.lua

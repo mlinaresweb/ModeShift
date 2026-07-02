@@ -2,7 +2,48 @@ local ModeShift = _G.ModeShift
 
 local MinimapModule = {}
 
+local function getAngle()
+  local char = ModeShift.Database and ModeShift.Database:GetCharDB()
+  if char and char.minimapAngle then
+    return char.minimapAngle
+  end
+  return ModeShift.Database and ModeShift.Database:GetGlobalSetting("minimapAngle") or 225
+end
+
+local function saveAngle(angle)
+  if ModeShift.Database then
+    ModeShift.Database:GetCharDB().minimapAngle = angle
+  end
+end
+
+local function updatePosition(button)
+  local angle = math.rad(getAngle())
+  local radius = 82
+  local x = math.cos(angle) * radius
+  local y = math.sin(angle) * radius
+  button:ClearAllPoints()
+  button:SetPoint("CENTER", Minimap, "CENTER", x, y)
+end
+
+local function updateDragPosition(button)
+  local mx, my = Minimap:GetCenter()
+  local px, py = GetCursorPosition()
+  local scale = UIParent:GetEffectiveScale()
+  px = px / scale
+  py = py / scale
+
+  local atan = math.atan2 or math.atan
+  local angle = math.deg(atan(py - my, px - mx))
+  saveAngle(angle)
+  updatePosition(button)
+end
+
 local function minimapButton_OnClick(self, button)
+  if self.modeShiftDragged then
+    self.modeShiftDragged = nil
+    return
+  end
+
   if button == "RightButton" then
     ModeShift.QuickMenu:Open(self)
   else
@@ -22,14 +63,26 @@ function MinimapModule:Initialize()
   local button = CreateFrame("Button", "ModeShiftMinimapButton", Minimap)
   button:SetSize(31, 31)
   button:SetFrameStrata("MEDIUM")
-  button:SetPoint("TOPLEFT", Minimap, "TOPLEFT", 0, 0)
+  updatePosition(button)
   button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  button:RegisterForDrag("LeftButton")
   button:SetScript("OnClick", minimapButton_OnClick)
+  button:SetScript("OnDragStart", function(self)
+    self.modeShiftDragging = true
+    self.modeShiftDragged = true
+    self:SetScript("OnUpdate", updateDragPosition)
+  end)
+  button:SetScript("OnDragStop", function(self)
+    self.modeShiftDragging = nil
+    self:SetScript("OnUpdate", nil)
+    updatePosition(self)
+  end)
   button:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:AddLine("ModeShift")
     GameTooltip:AddLine("Click izquierdo: configuracion", 1, 1, 1)
     GameTooltip:AddLine("Click derecho: cambio rapido", 1, 1, 1)
+    GameTooltip:AddLine("Arrastrar: mover alrededor del minimapa", 1, 1, 1)
     GameTooltip:Show()
   end)
   button:SetScript("OnLeave", function()

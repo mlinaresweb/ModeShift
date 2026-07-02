@@ -18,6 +18,7 @@ ModeShift.Constants = {
 
   DEFAULT_SETTINGS = {
     minimapButton = true,
+    minimapAngle = 225,
     addonCompartment = true,
     confirmBeforeApply = false,
     autoApplyPendingAfterCombat = true,

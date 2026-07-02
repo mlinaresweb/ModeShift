@@ -11,7 +11,7 @@ local TABS = {
   { key = "talents", text = "Talentos" },
   { key = "ui", text = "UI" },
   { key = "addons", text = "Addons" },
-  { key = "cvars", text = "CVars" },
+  { key = "cvars", text = "Avanzado" },
 }
 
 local MODE_TYPES = {
@@ -111,9 +111,17 @@ local function clearScroll(scrollFrame)
     return nil
   end
 
+  if scrollFrame.modeShiftChild then
+    scrollFrame.modeShiftChild:Hide()
+  end
+
   local child = CreateFrame("Frame", nil, scrollFrame)
   child:SetSize(1, 1)
+  if child.SetClipsChildren then
+    child:SetClipsChildren(true)
+  end
   scrollFrame:SetScrollChild(child)
+  scrollFrame.modeShiftChild = child
   return child
 end
 
@@ -161,6 +169,9 @@ function ConfigUI:Initialize()
   frame:SetScript("OnHide", function()
     if GameTooltip then
       GameTooltip:Hide()
+    end
+    if self.importFrame then
+      self.importFrame:Hide()
     end
   end)
 
@@ -676,8 +687,8 @@ function ConfigUI:GetAddonState(profile, addonName)
 end
 
 function ConfigUI:BuildAddonsTab(parent, profile, y)
-  y = self:AddSection(parent, "Addons por perfil", y)
-  y = self:AddDescription(parent, "Marca cada addon como activar, desactivar o ignorar. Los cambios de addons requieren reload.", y)
+  y = self:AddSection(parent, "Addons y perfiles internos", y)
+  y = self:AddDescription(parent, "Click en Estado para alternar Ignorar, Activar y Desactivar. Los perfiles internos aparecen solo para addons soportados.", y)
 
   local enabledCheck = makeCheck(parent, "Gestionar addons en este perfil", profile.addons and profile.addons.enabled, function(checked)
     profile.addons.enabled = checked
@@ -696,47 +707,156 @@ function ConfigUI:BuildAddonsTab(parent, profile, y)
     return y
   end
 
+  local profileCheck = makeCheck(parent, "Gestionar perfiles internos de addons soportados", profile.addonProfiles and profile.addonProfiles.enabled, function(checked)
+    profile.addonProfiles.enabled = checked
+    self:SaveProfile(profile)
+  end)
+  profileCheck:SetPoint("TOPLEFT", 0, y + 4)
+  y = y - 36
+
   local header = makeText(parent, "Addon", "GameFontNormalSmall")
   header:SetPoint("TOPLEFT", 4, y)
-  header:SetWidth(260)
-  local stateHeader = makeText(parent, "Estado en este perfil", "GameFontNormalSmall")
-  stateHeader:SetPoint("TOPLEFT", 300, y)
-  stateHeader:SetWidth(230)
+  header:SetWidth(190)
+  local stateHeader = makeText(parent, "Estado", "GameFontNormalSmall")
+  stateHeader:SetPoint("TOPLEFT", 205, y)
+  stateHeader:SetWidth(90)
+  local profileHeader = makeText(parent, "Perfil interno", "GameFontNormalSmall")
+  profileHeader:SetPoint("TOPLEFT", 320, y)
+  profileHeader:SetWidth(200)
   y = y - 22
 
   for _, addon in ipairs(addons) do
     local state = self:GetAddonState(profile, addon.name)
     local installedState = addon.enabled and "cargado/activo" or "desactivado"
-    local label = makeText(parent, addon.name .. " (" .. installedState .. ")")
+    local label = makeText(parent, addon.name)
     label:SetPoint("TOPLEFT", 4, y - 2)
-    label:SetWidth(275)
+    label:SetWidth(190)
+    if label.SetWordWrap then
+      label:SetWordWrap(false)
+    end
 
-    local enableButton = makeButton(parent, state == "enable" and "* Activar" or "Activar", 78, 22, function()
-      self:SetAddonState(profile, addon.name, "enable")
+    local stateText = "Ignorar"
+    if state == "enable" then
+      stateText = "Activar"
+    elseif state == "disable" then
+      stateText = "Desactivar"
+    end
+
+    local stateButton = makeButton(parent, stateText, 96, 22, function()
+      local current = self:GetAddonState(profile, addon.name)
+      local nextState = "enable"
+      if current == "enable" then
+        nextState = "disable"
+      elseif current == "disable" then
+        nextState = "ignore"
+      end
+      self:SetAddonState(profile, addon.name, nextState)
     end)
-    enableButton:SetPoint("TOPLEFT", 300, y)
+    stateButton:SetPoint("TOPLEFT", 205, y)
 
-    local disableButton = makeButton(parent, state == "disable" and "* Desactivar" or "Desactivar", 88, 22, function()
-      self:SetAddonState(profile, addon.name, "disable")
-    end)
-    disableButton:SetPoint("LEFT", enableButton, "RIGHT", 4, 0)
+    local details = makeText(parent, installedState, "GameFontDisableSmall")
+    details:SetPoint("TOPLEFT", 4, y - 16)
+    details:SetWidth(190)
 
-    local ignoreButton = makeButton(parent, state == "ignore" and "* Ignorar" or "Ignorar", 78, 22, function()
-      self:SetAddonState(profile, addon.name, "ignore")
-    end)
-    ignoreButton:SetPoint("LEFT", disableButton, "RIGHT", 4, 0)
-
-    y = y - 28
+    y = self:BuildAddonProfilePicker(parent, profile, addon.name, y)
+    y = y - 32
   end
 
   return y
 end
 
-function ConfigUI:BuildCVarsTab(parent, profile, y)
-  y = self:AddSection(parent, "CVars opcionales", y)
-  y = self:AddDescription(parent, "Usalo con cuidado. ModeShift aplicara estos CVars al activar el perfil.", y)
+function ConfigUI:BuildAddonProfilePicker(parent, profile, addonName, y)
+  profile.addonProfiles = profile.addonProfiles or { enabled = false, entries = {} }
+  profile.addonProfiles.entries = profile.addonProfiles.entries or {}
 
-  local enabledCheck = makeCheck(parent, "Aplicar CVars en este perfil", profile.cvars and profile.cvars.enabled, function(checked)
+  local integration = ModeShift.Integrations and ModeShift.Integrations:Get(addonName)
+  if not integration then
+    local unsupported = makeText(parent, "sin perfiles soportados", "GameFontDisableSmall")
+    unsupported:SetPoint("TOPLEFT", 320, y + 2)
+    unsupported:SetWidth(220)
+    return y
+  end
+
+  local entry = profile.addonProfiles.entries[addonName] or { enabled = false, profileName = nil }
+  local profiles = ModeShift.AddonProfileManager and ModeShift.AddonProfileManager:GetAvailableProfiles(addonName) or {}
+  local label = integration.displayName or addonName
+  local selected = entry.enabled and entry.profileName or "No cambiar"
+
+  local currentButton = makeButton(parent, selected, 190, 22, function()
+    if #profiles == 0 then
+      entry.enabled = not entry.enabled
+    elseif not entry.enabled or not entry.profileName then
+      entry.enabled = true
+      entry.profileName = profiles[1]
+    else
+      local nextIndex = nil
+      for index, profileName in ipairs(profiles) do
+        if profileName == entry.profileName then
+          nextIndex = index + 1
+          break
+        end
+      end
+      if not nextIndex or nextIndex > #profiles then
+        entry.enabled = false
+        entry.profileName = nil
+      else
+        entry.profileName = profiles[nextIndex]
+      end
+    end
+
+    if not entry.enabled then
+      entry.profileName = nil
+    end
+    profile.addonProfiles.entries[addonName] = entry
+    profile.addonProfiles.enabled = true
+    self:SaveProfile(profile)
+  end)
+  currentButton:SetPoint("TOPLEFT", 320, y)
+
+  local clearButton = makeButton(parent, "X", 24, 22, function()
+    profile.addonProfiles.entries[addonName] = nil
+    self:SaveProfile(profile)
+  end)
+  clearButton:SetPoint("LEFT", currentButton, "RIGHT", 4, 0)
+
+  if #profiles == 0 then
+    local note = makeText(parent, label .. ": sin lista disponible", "GameFontDisableSmall")
+    note:SetPoint("TOPLEFT", 320, y - 16)
+    note:SetWidth(230)
+    return y
+  end
+
+  local x = 320
+  local rowY = y - 26
+  for index, profileName in ipairs(profiles) do
+    if index <= 3 then
+      local button = makeButton(parent, profileName, 110, 20, function()
+        profile.addonProfiles.enabled = true
+        profile.addonProfiles.entries[addonName] = {
+          enabled = true,
+          profileName = profileName,
+        }
+        self:SaveProfile(profile)
+      end)
+      button:SetPoint("TOPLEFT", x, rowY)
+      x = x + 116
+    end
+  end
+
+  if #profiles > 3 then
+    local more = makeText(parent, "+" .. tostring(#profiles - 3), "GameFontDisableSmall")
+    more:SetPoint("TOPLEFT", x, rowY + 3)
+    more:SetWidth(40)
+  end
+
+  return y - 24
+end
+
+function ConfigUI:BuildCVarsTab(parent, profile, y)
+  y = self:AddSection(parent, "Opciones avanzadas de consola", y)
+  y = self:AddDescription(parent, "CVars son variables internas de configuracion de WoW. No las necesitas salvo que sepas exactamente que ajuste quieres guardar.", y)
+
+  local enabledCheck = makeCheck(parent, "Aplicar variables de consola en este perfil", profile.cvars and profile.cvars.enabled, function(checked)
     profile.cvars.enabled = checked
     self:SaveProfile(profile)
   end)
@@ -747,7 +867,7 @@ function ConfigUI:BuildCVarsTab(parent, profile, y)
   nameEdit:SetPoint("TOPLEFT", 4, y)
   local valueEdit = makeEditBox(parent, 160, "")
   valueEdit:SetPoint("LEFT", nameEdit, "RIGHT", 12, 0)
-  local addButton = makeButton(parent, "Anadir CVar", 110, 24, function()
+  local addButton = makeButton(parent, "Anadir ajuste", 120, 24, function()
     local name = ModeShift.Utils:Trim(nameEdit:GetText())
     local value = ModeShift.Utils:Trim(valueEdit:GetText())
     if name ~= "" then
@@ -775,7 +895,7 @@ function ConfigUI:BuildCVarsTab(parent, profile, y)
   end
 
   if not hasAny then
-    y = self:AddDescription(parent, "No hay CVars configurados.", y)
+    y = self:AddDescription(parent, "No hay variables de consola configuradas.", y)
   end
 
   return y
@@ -804,6 +924,11 @@ function ConfigUI:SerializeProfile(profile)
   for _, addonName in ipairs(profile.addons.disable or {}) do
     table.insert(lines, "addon.disable=" .. escapeValue(addonName))
   end
+  for addonName, entry in pairs(profile.addonProfiles.entries or {}) do
+    if type(entry) == "table" and entry.enabled and entry.profileName then
+      table.insert(lines, "addonProfile." .. escapeValue(addonName) .. "=" .. escapeValue(entry.profileName))
+    end
+  end
 
   table.insert(lines, "cvars.enabled=" .. (profile.cvars.enabled and "1" or "0"))
   for name, value in pairs(profile.cvars.values or {}) do
@@ -825,6 +950,7 @@ function ConfigUI:DeserializeProfile(text)
     talents = { enabled = false, configName = nil, autoApply = true },
     editMode = { enabled = false, layoutName = nil },
     addons = { enabled = true, enable = {}, disable = {} },
+    addonProfiles = { enabled = false, entries = {} },
     cvars = { enabled = false, values = {} },
   }
 
@@ -873,6 +999,13 @@ function ConfigUI:DeserializeProfile(text)
           table.insert(profile.addons.enable, value)
         elseif key == "addon.disable" then
           table.insert(profile.addons.disable, value)
+        elseif key:match("^addonProfile%.") then
+          local addonName = unescapeValue(key:gsub("^addonProfile%.", ""))
+          profile.addonProfiles.enabled = true
+          profile.addonProfiles.entries[addonName] = {
+            enabled = true,
+            profileName = value,
+          }
         elseif key == "cvars.enabled" then
           profile.cvars.enabled = value == "1"
         elseif key:match("^cvar%.") then

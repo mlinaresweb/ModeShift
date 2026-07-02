@@ -18,6 +18,7 @@ function Database:Initialize()
     lastAppliedProfileId = nil,
     pendingProfileId = nil,
     requiresReload = false,
+    minimapAngle = nil,
   })
 
   self.db = _G.ModeShiftDB

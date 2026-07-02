@@ -65,13 +65,12 @@ function ApplyEngine:ApplyCVars(profile, result)
 end
 
 function ApplyEngine:ApplyAddonProfiles(profile, result)
-  local addonProfiles = profile and profile.addonProfiles or nil
-  if not addonProfiles or not addonProfiles.enabled then
-    table.insert(result.skipped, "Perfiles internos de addons desactivados")
+  if not ModeShift.AddonProfileManager then
+    table.insert(result.warnings, "AddonProfileManager no esta disponible")
     return
   end
 
-  table.insert(result.warnings, "Integraciones de perfiles de addons preparadas para Fase 3; no se aplican todavia")
+  self:MergeResult(result, ModeShift.AddonProfileManager:Apply(profile))
 end
 
 function ApplyEngine:ApplyEditMode(profile, result)
