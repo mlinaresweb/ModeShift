@@ -1,0 +1,24 @@
+## Interface: 120000
+## Title: ModeShift
+## Notes: Configurable profile switcher for specs, equipment, talents, UI layouts, addons, and CVars.
+## Author: ModeShift
+## Version: 0.1.0
+## SavedVariables: ModeShiftDB
+## SavedVariablesPerCharacter: ModeShiftCharDB
+## IconTexture: Interface\Icons\INV_Misc_Gear_01
+## AddonCompartmentFunc: ModeShift_OnAddonCompartmentClick
+## AddonCompartmentFuncOnEnter: ModeShift_OnAddonCompartmentEnter
+## AddonCompartmentFuncOnLeave: ModeShift_OnAddonCompartmentLeave
+
+Core.lua
+Constants.lua
+Utils.lua
+Database.lua
+ProfileManager.lua
+EquipmentManager.lua
+TalentManager.lua
+AddonManager.lua
+ApplyEngine.lua
+QuickMenu.lua
+Minimap.lua
+SlashCommands.lua
