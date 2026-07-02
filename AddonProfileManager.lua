@@ -155,9 +155,20 @@ function AddonProfileManager:CanShowOptionPicker(addonName)
 end
 
 function AddonProfileManager:CanShowProfilePicker(addonName)
-  if ModeShift.Integrations and ModeShift.Integrations:Get(addonName) then
+  local integration = ModeShift.Integrations and ModeShift.Integrations:Get(addonName)
+  if integration and type(integration.getProfiles) == "function" then
+    local profiles = self:GetAvailableProfiles(addonName, true)
+    if #profiles > 0 then
+      return true
+    end
+    local currentProfile = self:GetCurrentProfile(addonName, true)
+    return currentProfile ~= nil
+  end
+
+  if #self:GetAvailableProfiles(addonName, false) > 0 then
     return true
   end
+
   return false
 end
 

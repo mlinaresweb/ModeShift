@@ -18,7 +18,7 @@ end
 
 local function updatePosition(button)
   local angle = math.rad(getAngle())
-  local radius = ((Minimap:GetWidth() or 140) / 2) + 12
+  local radius = ((Minimap:GetWidth() or 140) / 2) + 6
   local x = math.cos(angle) * radius
   local y = math.sin(angle) * radius
   button:ClearAllPoints()
@@ -31,6 +31,14 @@ local function updateDragPosition(button)
   local scale = UIParent:GetEffectiveScale()
   px = px / scale
   py = py / scale
+
+  if button.modeShiftDragStartX and button.modeShiftDragStartY then
+    local dx = px - button.modeShiftDragStartX
+    local dy = py - button.modeShiftDragStartY
+    if (dx * dx) + (dy * dy) > 16 then
+      button.modeShiftDragged = true
+    end
+  end
 
   local atan = math.atan2 or math.atan
   local angle = math.deg(atan(py - my, px - mx))
@@ -69,12 +77,18 @@ function MinimapModule:Initialize()
   button:RegisterForDrag("LeftButton")
   button:SetScript("OnClick", minimapButton_OnClick)
   button:SetScript("OnDragStart", function(self)
+    local px, py = GetCursorPosition()
+    local scale = UIParent:GetEffectiveScale()
+    self.modeShiftDragStartX = px / scale
+    self.modeShiftDragStartY = py / scale
     self.modeShiftDragging = true
-    self.modeShiftDragged = true
+    self.modeShiftDragged = false
     self:SetScript("OnUpdate", updateDragPosition)
   end)
   button:SetScript("OnDragStop", function(self)
     self.modeShiftDragging = nil
+    self.modeShiftDragStartX = nil
+    self.modeShiftDragStartY = nil
     self:SetScript("OnUpdate", nil)
     updatePosition(self)
   end)
@@ -90,15 +104,15 @@ function MinimapModule:Initialize()
     GameTooltip:Hide()
   end)
 
-  button.icon = button:CreateTexture(nil, "BACKGROUND")
+  button.icon = button:CreateTexture(nil, "ARTWORK")
   button.icon:SetTexture(ModeShift.Constants.DEFAULT_ICON)
-  button.icon:SetSize(19, 19)
+  button.icon:SetSize(20, 20)
   button.icon:SetPoint("CENTER", 0, 0)
 
   button.border = button:CreateTexture(nil, "OVERLAY")
   button.border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
   button.border:SetSize(52, 52)
-  button.border:SetPoint("TOPLEFT", -9, 9)
+  button.border:SetPoint("TOPLEFT", button, "TOPLEFT", -9, 9)
 
   self.button = button
 end

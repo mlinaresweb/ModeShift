@@ -18,6 +18,10 @@ local function profileReloadHint(profile)
   return ""
 end
 
+local function selectedProfileText(profile)
+  return "[X] " .. tostring(profile.name or profile.id or "Perfil")
+end
+
 function QuickMenu:GetProfiles()
   if not ModeShift.ProfileManager then
     return {}
@@ -77,20 +81,22 @@ function QuickMenu:Open(anchor, options)
 
       if groupCount <= 1 then
         for _, profile in ipairs(profiles) do
-          local prefix = profile.id == activeProfileId and "* " or ""
+          local profileValue = profile
+          local name = profile.id == activeProfileId and selectedProfileText(profile) or (profile.name or profile.id)
           local suffix = profile.id == preferred and " (recomendado)" or ""
-          addButton(root, prefix .. (profile.name or profile.id) .. suffix .. profileReloadHint(profile), function()
-            ModeShift.ApplyEngine:ApplyProfile(profile.id, { source = "quick-menu" })
+          addButton(root, name .. suffix .. profileReloadHint(profile), function()
+            ModeShift.ApplyEngine:ApplyProfile(profileValue.id, { source = "quick-menu" })
           end)
         end
       else
         for _, group in pairs(grouped) do
           local submenu = root:CreateButton(group.specName or tostring(group.specId or "Sin spec"))
           for _, profile in ipairs(group.profiles) do
-            local prefix = profile.id == activeProfileId and "* " or ""
+            local profileValue = profile
+            local name = profile.id == activeProfileId and selectedProfileText(profile) or (profile.name or profile.id)
             local suffix = profile.id == preferred and " (recomendado)" or ""
-            submenu:CreateButton(prefix .. (profile.name or profile.id) .. suffix .. profileReloadHint(profile), function()
-              ModeShift.ApplyEngine:ApplyProfile(profile.id, { source = "quick-menu" })
+            submenu:CreateButton(name .. suffix .. profileReloadHint(profile), function()
+              ModeShift.ApplyEngine:ApplyProfile(profileValue.id, { source = "quick-menu" })
             end)
           end
         end

@@ -116,6 +116,10 @@ local function setShown(frame, shown)
   end
 end
 
+local function selectedText(text)
+  return "[X] " .. tostring(text or "")
+end
+
 local function escapeValue(value)
   value = tostring(value or "")
   value = value:gsub("\\", "\\\\")
@@ -153,6 +157,7 @@ function ConfigUI:Initialize()
     if GameTooltip then
       GameTooltip:Hide()
     end
+    self:CloseDropdown()
     if MenuUtil and MenuUtil.CloseAllMenus then
       MenuUtil.CloseAllMenus()
     end
@@ -233,6 +238,62 @@ function ConfigUI:Initialize()
   frame.editorScroll:SetSize(720, 540)
 
   self.frame = frame
+end
+
+function ConfigUI:CloseDropdown()
+  if self.dropdown then
+    self.dropdown:Hide()
+    self.dropdown = nil
+  end
+end
+
+function ConfigUI:OpenDropdown(anchor, title, items, width)
+  self:CloseDropdown()
+  if not anchor or type(items) ~= "table" then
+    return
+  end
+
+  local rowHeight = 24
+  local dropdown = CreateFrame("Frame", "ModeShiftDropdownFrame", UIParent, "BasicFrameTemplateWithInset")
+  dropdown:SetSize(width or 260, math.min(560, 34 + (#items * rowHeight)))
+  dropdown:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -4)
+  dropdown:SetClampedToScreen(true)
+  raiseFrame(dropdown)
+  dropdown:SetFrameLevel(10000)
+  dropdown:EnableMouse(true)
+
+  dropdown.title = makeText(dropdown, title or "Seleccion", "GameFontNormalSmall")
+  dropdown.title:SetPoint("TOPLEFT", 10, -8)
+  dropdown.title:SetWidth((width or 260) - 20)
+
+  local y = -28
+  for _, item in ipairs(items) do
+    local itemData = item
+    if item.divider then
+      local line = dropdown:CreateTexture(nil, "ARTWORK")
+      line:SetColorTexture(0.6, 0.6, 0.6, 0.35)
+      line:SetPoint("TOPLEFT", 10, y - 6)
+      line:SetSize((width or 260) - 20, 1)
+      y = y - 10
+    else
+      local label = itemData.selected and selectedText(itemData.text) or tostring(itemData.text or "")
+      local button = makeButton(dropdown, label, (width or 260) - 20, 22, function()
+        self:CloseDropdown()
+        if type(itemData.onClick) == "function" then
+          itemData.onClick()
+        end
+      end)
+      button:SetPoint("TOPLEFT", 10, y)
+      button:SetFrameLevel(dropdown:GetFrameLevel() + 1)
+      if itemData.disabled then
+        button:Disable()
+      end
+      y = y - rowHeight
+    end
+  end
+
+  self.dropdown = dropdown
+  dropdown:Show()
 end
 
 function ConfigUI:Open()
@@ -321,8 +382,8 @@ function ConfigUI:RefreshProfileList()
 
   for _, profile in ipairs(profiles) do
     local name = profile.name or "Perfil"
-    local prefix = profile.id == activeProfileId and "* " or ""
-    local button = makeButton(child, prefix .. name, 210, 26, function()
+    local label = profile.id == activeProfileId and selectedText(name) or name
+    local button = makeButton(child, label, 210, 26, function()
       self.selectedProfileId = profile.id
       self:Refresh()
     end)
@@ -464,12 +525,13 @@ function ConfigUI:BuildProfileTab(parent, profile, y)
   local x = 4
   local rowY = y
   for index, modeType in ipairs(MODE_TYPES) do
-    local button = makeButton(parent, (profile.modeType == modeType and "* " or "") .. modeType, 112, 24, function()
+    local selected = profile.modeType == modeType
+    local button = makeButton(parent, selected and selectedText(modeType) or modeType, 136, 24, function()
       profile.modeType = modeType
       self:SaveProfile(profile)
     end)
     button:SetPoint("TOPLEFT", x, rowY)
-    x = x + 118
+    x = x + 142
     if index == 4 then
       x = 4
       rowY = rowY - 30
@@ -539,7 +601,7 @@ function ConfigUI:BuildEquipmentTab(parent, profile, y)
 
   for _, set in ipairs(sets) do
     local selected = profile.equipment and profile.equipment.enabled and profile.equipment.setName == set.name
-    local button = makeButton(parent, (selected and "* " or "") .. set.name, 300, 24, function()
+    local button = makeButton(parent, selected and selectedText(set.name) or set.name, 300, 24, function()
       profile.equipment.enabled = true
       profile.equipment.setId = set.id
       profile.equipment.setName = set.name
@@ -590,7 +652,7 @@ function ConfigUI:BuildTalentsTab(parent, profile, y)
 
   for _, loadout in ipairs(loadouts) do
     local selected = profile.talents and profile.talents.enabled and profile.talents.configName == loadout.name
-    local button = makeButton(parent, (selected and "* " or "") .. loadout.name, 320, 24, function()
+    local button = makeButton(parent, selected and selectedText(loadout.name) or loadout.name, 320, 24, function()
       profile.talents.enabled = true
       profile.talents.configId = loadout.id
       profile.talents.configName = loadout.name
@@ -637,7 +699,7 @@ function ConfigUI:BuildUITab(parent, profile, y)
 
   for _, layout in ipairs(layouts) do
     local selected = profile.editMode and profile.editMode.enabled and profile.editMode.layoutName == layout.name
-    local button = makeButton(parent, (selected and "* " or "") .. layout.name, 320, 24, function()
+    local button = makeButton(parent, selected and selectedText(layout.name) or layout.name, 320, 24, function()
       profile.editMode.enabled = true
       profile.editMode.layoutId = layout.id
       profile.editMode.layoutName = layout.name
@@ -751,7 +813,12 @@ function ConfigUI:BuildAddonProfilePicker(parent, profile, addonName, y)
   profile.addonProfiles.entries = profile.addonProfiles.entries or {}
 
   local entry = profile.addonProfiles.entries[addonName] or { enabled = false, profileName = nil }
-  local selected = entry.enabled and entry.profileName or "Perfil..."
+  local hasSavedProfile = entry.enabled and entry.profileName and entry.profileName ~= ""
+  if not hasSavedProfile and not (ModeShift.AddonProfileManager and ModeShift.AddonProfileManager:CanShowProfilePicker(addonName)) then
+    return y
+  end
+
+  local selected = hasSavedProfile and ("Perfil: " .. entry.profileName) or "Elegir perfil"
 
   local currentButton = makeButton(parent, selected, 220, 22, function(button)
     self:OpenAddonProfileDropdown(button, profile, addonName)
@@ -792,36 +859,49 @@ function ConfigUI:OpenAddonProfileDropdown(anchor, profile, addonName)
   local profiles = ModeShift.AddonProfileManager and ModeShift.AddonProfileManager:GetAvailableProfiles(addonName, true) or {}
   local currentProfile = ModeShift.AddonProfileManager and ModeShift.AddonProfileManager:GetCurrentProfile(addonName, true) or nil
 
-  if MenuUtil and MenuUtil.CreateContextMenu then
-    MenuUtil.CreateContextMenu(anchor, function(_, root)
-      root:CreateTitle(addonName)
-      if currentProfile then
-        root:CreateButton("Usar actual: " .. currentProfile, function()
-          self:SetAddonProfile(profile, addonName, currentProfile)
-        end)
-      end
-      for _, profileName in ipairs(profiles or {}) do
-        root:CreateButton(profileName, function()
-          self:SetAddonProfile(profile, addonName, profileName)
-        end)
-      end
-      if (not profiles or #profiles == 0) and not currentProfile then
-        root:CreateTitle("No he encontrado perfiles")
-      end
-      root:CreateDivider()
-      root:CreateButton("Limpiar seleccion", function()
-        self:SetAddonProfile(profile, addonName, nil)
-      end)
-    end)
-    return
+  local entry = profile.addonProfiles and profile.addonProfiles.entries and profile.addonProfiles.entries[addonName] or nil
+  local selected = entry and entry.profileName or nil
+  local items = {}
+  local seen = {}
+
+  if currentProfile then
+    table.insert(items, {
+      text = "Usar actual: " .. currentProfile,
+      selected = selected == currentProfile,
+      onClick = function()
+        self:SetAddonProfile(profile, addonName, currentProfile)
+      end,
+    })
+    seen[currentProfile] = true
   end
 
-  local nextProfile = currentProfile or (profiles and profiles[1]) or nil
-  if nextProfile then
-    self:SetAddonProfile(profile, addonName, nextProfile)
-  else
-    self:SetAddonProfile(profile, addonName, nil)
+  for _, profileName in ipairs(profiles or {}) do
+    local profileValue = profileName
+    if not seen[profileValue] then
+      table.insert(items, {
+        text = profileValue,
+        selected = selected == profileValue,
+        onClick = function()
+          self:SetAddonProfile(profile, addonName, profileValue)
+        end,
+      })
+      seen[profileValue] = true
+    end
   end
+
+  if #items == 0 then
+    table.insert(items, { text = "No he encontrado perfiles", disabled = true })
+  end
+
+  table.insert(items, { divider = true })
+  table.insert(items, {
+    text = "Limpiar seleccion",
+    onClick = function()
+      self:SetAddonProfile(profile, addonName, nil)
+    end,
+  })
+
+  self:OpenDropdown(anchor, addonName, items, 280)
 end
 
 function ConfigUI:BuildAddonOptionPicker(parent, profile, addonName, y)
@@ -860,31 +940,49 @@ function ConfigUI:OpenAddonOptionDropdown(anchor, profile, addonName)
   local options = ModeShift.AddonProfileManager and ModeShift.AddonProfileManager:GetAvailableOptions(addonName, true) or {}
   local currentOption = ModeShift.AddonProfileManager and ModeShift.AddonProfileManager:GetCurrentOption(addonName, true) or nil
 
-  if MenuUtil and MenuUtil.CreateContextMenu then
-    MenuUtil.CreateContextMenu(anchor, function(_, root)
-      root:CreateTitle(addonName .. " config")
-      if currentOption then
-        root:CreateButton("Usar actual: " .. currentOption, function()
-          self:SetAddonOption(profile, addonName, currentOption)
-        end)
-      end
-      for _, optionName in ipairs(options or {}) do
-        root:CreateButton(optionName, function()
-          self:SetAddonOption(profile, addonName, optionName)
-        end)
-      end
-      if (not options or #options == 0) and not currentOption then
-        root:CreateTitle("No he encontrado configs")
-      end
-      root:CreateDivider()
-      root:CreateButton("Limpiar seleccion", function()
-        self:SetAddonOption(profile, addonName, nil)
-      end)
-    end)
-    return
+  local entry = profile.addonProfiles and profile.addonProfiles.entries and profile.addonProfiles.entries[addonName] or nil
+  local selected = entry and entry.optionName or nil
+  local items = {}
+  local seen = {}
+
+  if currentOption then
+    table.insert(items, {
+      text = "Usar actual: " .. currentOption,
+      selected = selected == currentOption,
+      onClick = function()
+        self:SetAddonOption(profile, addonName, currentOption)
+      end,
+    })
+    seen[currentOption] = true
   end
 
-  self:SetAddonOption(profile, addonName, currentOption or (options and options[1]) or nil)
+  for _, optionName in ipairs(options or {}) do
+    local optionValue = optionName
+    if not seen[optionValue] then
+      table.insert(items, {
+        text = optionValue,
+        selected = selected == optionValue,
+        onClick = function()
+          self:SetAddonOption(profile, addonName, optionValue)
+        end,
+      })
+      seen[optionValue] = true
+    end
+  end
+
+  if #items == 0 then
+    table.insert(items, { text = "No he encontrado configs", disabled = true })
+  end
+
+  table.insert(items, { divider = true })
+  table.insert(items, {
+    text = "Limpiar seleccion",
+    onClick = function()
+      self:SetAddonOption(profile, addonName, nil)
+    end,
+  })
+
+  self:OpenDropdown(anchor, addonName .. " config", items, 280)
 end
 
 function ConfigUI:BuildCVarsTab(parent, profile, y)
