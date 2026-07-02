@@ -698,7 +698,18 @@ function ConfigUI:BuildAddonsTab(parent, profile, y)
   y = y - 34
 
   local addons = ModeShift.AddonManager:GetInstalledAddons()
+  for _, addon in ipairs(addons) do
+    addon.modeShiftProfiles = ModeShift.AddonProfileManager and ModeShift.AddonProfileManager:GetAvailableProfiles(addon.name) or {}
+    addon.modeShiftProfileCount = #addon.modeShiftProfiles
+    addon.modeShiftSelected = self:GetAddonState(profile, addon.name) ~= "ignore"
+  end
   table.sort(addons, function(a, b)
+    if a.modeShiftSelected ~= b.modeShiftSelected then
+      return a.modeShiftSelected
+    end
+    if (a.modeShiftProfileCount or 0) ~= (b.modeShiftProfileCount or 0) then
+      return (a.modeShiftProfileCount or 0) > (b.modeShiftProfileCount or 0)
+    end
     return string.lower(a.name or "") < string.lower(b.name or "")
   end)
 
@@ -770,7 +781,8 @@ function ConfigUI:BuildAddonProfilePicker(parent, profile, addonName, y)
   profile.addonProfiles.entries = profile.addonProfiles.entries or {}
 
   local integration = ModeShift.Integrations and ModeShift.Integrations:Get(addonName)
-  if not integration then
+  local profiles = ModeShift.AddonProfileManager and ModeShift.AddonProfileManager:GetAvailableProfiles(addonName) or {}
+  if not integration and #profiles == 0 then
     local unsupported = makeText(parent, "sin perfiles soportados", "GameFontDisableSmall")
     unsupported:SetPoint("TOPLEFT", 320, y + 2)
     unsupported:SetWidth(220)
@@ -778,8 +790,7 @@ function ConfigUI:BuildAddonProfilePicker(parent, profile, addonName, y)
   end
 
   local entry = profile.addonProfiles.entries[addonName] or { enabled = false, profileName = nil }
-  local profiles = ModeShift.AddonProfileManager and ModeShift.AddonProfileManager:GetAvailableProfiles(addonName) or {}
-  local label = integration.displayName or addonName
+  local label = integration and integration.displayName or addonName
   local selected = entry.enabled and entry.profileName or "No cambiar"
 
   local currentButton = makeButton(parent, selected, 190, 22, function()
@@ -829,8 +840,8 @@ function ConfigUI:BuildAddonProfilePicker(parent, profile, addonName, y)
   local x = 320
   local rowY = y - 26
   for index, profileName in ipairs(profiles) do
-    if index <= 3 then
-      local button = makeButton(parent, profileName, 110, 20, function()
+    if index <= 2 then
+      local button = makeButton(parent, profileName, 88, 20, function()
         profile.addonProfiles.enabled = true
         profile.addonProfiles.entries[addonName] = {
           enabled = true,
@@ -839,14 +850,14 @@ function ConfigUI:BuildAddonProfilePicker(parent, profile, addonName, y)
         self:SaveProfile(profile)
       end)
       button:SetPoint("TOPLEFT", x, rowY)
-      x = x + 116
+      x = x + 94
     end
   end
 
-  if #profiles > 3 then
-    local more = makeText(parent, "+" .. tostring(#profiles - 3), "GameFontDisableSmall")
+  if #profiles > 2 then
+    local more = makeText(parent, "+" .. tostring(#profiles - 2) .. " mas", "GameFontDisableSmall")
     more:SetPoint("TOPLEFT", x, rowY + 3)
-    more:SetWidth(40)
+    more:SetWidth(70)
   end
 
   return y - 24

@@ -30,6 +30,7 @@ Integrations\BigWigs.lua
 Integrations\DBM.lua
 Integrations\WeakAuras.lua
 AddonProfileManager.lua
+Diagnostics.lua
 ApplyEngine.lua
 ConfigUI.lua
 QuickMenu.lua

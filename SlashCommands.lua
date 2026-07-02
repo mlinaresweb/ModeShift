@@ -83,6 +83,10 @@ function SlashCommands:Handle(message)
     self:HandleAddon(args)
   elseif command == "addons" then
     self:HandleAddons()
+  elseif command == "doctor" or command == "diagnostics" then
+    if ModeShift.Diagnostics then
+      ModeShift.Diagnostics:PrintSummary()
+    end
   elseif command == "reapply" then
     ModeShift.ApplyEngine:ReapplyCurrentProfile()
   elseif command == "quick" then
@@ -183,6 +187,7 @@ function SlashCommands:Help()
   ModeShift:Print("/ms set talents <profileId> <nombre> - asignar loadout")
   ModeShift:Print("/ms addon <profileId> enable|disable|ignore <addonName> - configurar addon")
   ModeShift:Print("/ms addons - listar addons instalados")
+  ModeShift:Print("/ms doctor - diagnostico rapido")
   ModeShift:Print("/ms reload - recargar interfaz")
   ModeShift:Print("/ms debug - alternar debug")
 end

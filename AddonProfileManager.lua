@@ -11,17 +11,28 @@ end
 
 function AddonProfileManager:GetAvailableProfiles(addonName)
   local integration = ModeShift.Integrations and ModeShift.Integrations:Get(addonName)
-  if not integration or type(integration.getProfiles) ~= "function" then
-    return {}
+  if integration and type(integration.getProfiles) == "function" then
+    local ok, profiles = ModeShift:SafeCall("getProfiles", integration.getProfiles)
+    if ok and type(profiles) == "table" and #profiles > 0 then
+      table.sort(profiles)
+      return profiles
+    end
   end
 
-  local ok, profiles = ModeShift:SafeCall("getProfiles", integration.getProfiles)
-  if ok and type(profiles) == "table" then
+  if ModeShift.Integrations then
+    local profiles = ModeShift.Integrations:GetGenericProfiles(addonName)
     table.sort(profiles)
     return profiles
   end
 
   return {}
+end
+
+function AddonProfileManager:CanShowProfilePicker(addonName)
+  if ModeShift.Integrations and ModeShift.Integrations:Get(addonName) then
+    return true
+  end
+  return #self:GetAvailableProfiles(addonName) > 0
 end
 
 function AddonProfileManager:Apply(profile)
@@ -37,7 +48,13 @@ function AddonProfileManager:Apply(profile)
     if type(entry) == "table" and entry.enabled and entry.profileName and entry.profileName ~= "" then
       local integration = ModeShift.Integrations and ModeShift.Integrations:Get(addonName)
       if not integration then
-        table.insert(result.warnings, "Sin integracion para " .. tostring(addonName))
+        local ok, appliedOrErr, extraErr = ModeShift:SafeCall("applyGenericProfile", ModeShift.Integrations.ApplyGenericProfile, ModeShift.Integrations, addonName, entry.profileName)
+        if ok and appliedOrErr ~= false then
+          table.insert(result.applied, "Perfil " .. tostring(addonName) .. ": " .. entry.profileName)
+        else
+          result.success = false
+          table.insert(result.warnings, tostring(addonName) .. ": " .. tostring(extraErr or appliedOrErr or "no aplicado"))
+        end
       elseif integration.isAvailable and not integration.isAvailable() then
         table.insert(result.warnings, tostring(integration.displayName or addonName) .. " no esta cargado")
       elseif type(integration.applyProfile) ~= "function" then
