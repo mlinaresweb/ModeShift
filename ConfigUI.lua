@@ -99,6 +99,53 @@ local function makeText(parent, text, font)
   return label
 end
 
+local function makeIcon(parent, texture, size)
+  local icon = parent:CreateTexture(nil, "ARTWORK")
+  icon:SetSize(size or 18, size or 18)
+  icon:SetTexture(texture or "Interface\\Icons\\INV_Misc_QuestionMark")
+  if icon.SetTexCoord then
+    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+  end
+  return icon
+end
+
+local function setClipboardText(text)
+  if C_Clipboard and C_Clipboard.SetClipboard then
+    local ok = pcall(C_Clipboard.SetClipboard, text or "")
+    if ok then
+      return true
+    end
+  end
+  if CopyToClipboard then
+    local ok = pcall(CopyToClipboard, text or "")
+    if ok then
+      return true
+    end
+  end
+  return false
+end
+
+local function getClipboardText()
+  if C_Clipboard then
+    local methods = { "GetClipboard", "GetClipboardText", "GetText" }
+    for _, methodName in ipairs(methods) do
+      if type(C_Clipboard[methodName]) == "function" then
+        local ok, value = pcall(C_Clipboard[methodName])
+        if ok and type(value) == "string" and value ~= "" then
+          return value
+        end
+      end
+    end
+  end
+  if GetClipboardText then
+    local ok, value = pcall(GetClipboardText)
+    if ok and type(value) == "string" and value ~= "" then
+      return value
+    end
+  end
+  return nil
+end
+
 local function styleButton(button, selected)
   if not button then
     return
@@ -970,7 +1017,7 @@ function ConfigUI:BuildEquipmentTab(parent, profile, y)
 
   for _, set in ipairs(sets) do
     local selected = profile.equipment and profile.equipment.enabled and profile.equipment.setName == set.name
-    local button = makeButton(parent, set.name, 300, 24, function()
+    local button = makeButton(parent, "     " .. tostring(set.name or ""), 320, 24, function()
       profile.equipment.enabled = true
       profile.equipment.setId = set.id
       profile.equipment.setName = set.name
@@ -979,6 +1026,8 @@ function ConfigUI:BuildEquipmentTab(parent, profile, y)
     styleButton(button, selected)
     addHover(button, selected)
     button:SetPoint("TOPLEFT", 4, y)
+    local icon = makeIcon(button, set.icon, 18)
+    icon:SetPoint("LEFT", 7, 0)
     y = y - 28
   end
 
@@ -1156,18 +1205,25 @@ function ConfigUI:BuildAddonsTab(parent, profile, y)
   profileCheck:SetPoint("TOPLEFT", 0, y + 4)
   y = y - 36
 
+  local addonTextX = 54
+  local addonWidth = 245
+  local profileX = 330
+  local profileWidth = 205
+  local optionX = 545
+  local optionWidth = 130
+
   local header = makeText(parent, "Addon", "GameFontNormalSmall")
-  header:SetPoint("TOPLEFT", 30, y)
-  header:SetWidth(190)
+  header:SetPoint("TOPLEFT", addonTextX, y)
+  header:SetWidth(addonWidth)
   local stateHeader = makeText(parent, "Cargar", "GameFontNormalSmall")
   stateHeader:SetPoint("TOPLEFT", 4, y)
   stateHeader:SetWidth(55)
   local profileHeader = makeText(parent, "Perfil interno", "GameFontNormalSmall")
-  profileHeader:SetPoint("TOPLEFT", 320, y)
-  profileHeader:SetWidth(210)
+  profileHeader:SetPoint("TOPLEFT", profileX, y)
+  profileHeader:SetWidth(profileWidth)
   local configHeader = makeText(parent, "Disenos", "GameFontNormalSmall")
-  configHeader:SetPoint("TOPLEFT", 560, y)
-  configHeader:SetWidth(100)
+  configHeader:SetPoint("TOPLEFT", optionX, y)
+  configHeader:SetWidth(optionWidth)
   y = y - 22
 
   for _, addon in ipairs(addons) do
@@ -1183,26 +1239,33 @@ function ConfigUI:BuildAddonsTab(parent, profile, y)
       loadCheck:Disable()
     end
 
-    local label = makeText(parent, addon.name)
-    label:SetPoint("TOPLEFT", 30, y - 2)
-    label:SetWidth(190)
+    local icon = makeIcon(parent, addon.icon, 18)
+    icon:SetPoint("TOPLEFT", 30, y + 1)
+
+    local label = makeText(parent, addon.title or addon.name)
+    label:SetPoint("TOPLEFT", addonTextX, y - 2)
+    label:SetWidth(addonWidth)
     if label.SetWordWrap then
       label:SetWordWrap(false)
     end
 
-    local details = makeText(parent, installedState, "GameFontDisableSmall")
-    details:SetPoint("TOPLEFT", 30, y - 16)
-    details:SetWidth(190)
+    local detailText = installedState
+    if addon.title and addon.title ~= addon.name then
+      detailText = addon.name .. " - " .. installedState
+    end
+    local details = makeText(parent, detailText, "GameFontDisableSmall")
+    details:SetPoint("TOPLEFT", addonTextX, y - 16)
+    details:SetWidth(addonWidth)
 
-    y = self:BuildAddonProfilePicker(parent, profile, addon.name, y)
-    self:BuildAddonOptionPicker(parent, profile, addon.name, y)
+    y = self:BuildAddonProfilePicker(parent, profile, addon.name, y, profileX, profileWidth)
+    self:BuildAddonOptionPicker(parent, profile, addon.name, y, optionX, optionWidth)
     y = y - 32
   end
 
   return y
 end
 
-function ConfigUI:BuildAddonProfilePicker(parent, profile, addonName, y)
+function ConfigUI:BuildAddonProfilePicker(parent, profile, addonName, y, x, width)
   profile.addonProfiles = profile.addonProfiles or { enabled = false, entries = {} }
   profile.addonProfiles.entries = profile.addonProfiles.entries or {}
 
@@ -1224,12 +1287,12 @@ function ConfigUI:BuildAddonProfilePicker(parent, profile, addonName, y)
     text = entry.profileName
   end
 
-  local currentButton = makeButton(parent, text, 220, 22, function(button)
+  local currentButton = makeButton(parent, text, width or 220, 22, function(button)
     self:OpenAddonProfileDropdown(button, profile, addonName)
   end)
   styleButton(currentButton, false)
   addHover(currentButton, false)
-  currentButton:SetPoint("TOPLEFT", 320, y)
+  currentButton:SetPoint("TOPLEFT", x or 320, y)
 
   return y
 end
@@ -1314,7 +1377,7 @@ function ConfigUI:OpenAddonProfileDropdown(anchor, profile, addonName)
   self:OpenDropdown(anchor, addonName, items, 320)
 end
 
-function ConfigUI:BuildAddonOptionPicker(parent, profile, addonName, y)
+function ConfigUI:BuildAddonOptionPicker(parent, profile, addonName, y, x, width)
   if not (ModeShift.AddonProfileManager and ModeShift.AddonProfileManager:CanShowOptionPicker(addonName)) then
     return
   end
@@ -1329,12 +1392,12 @@ function ConfigUI:BuildAddonOptionPicker(parent, profile, addonName, y)
   local defaultText = isCooldownManagerAddon(addonName) and "Disenos CDM" or "Config..."
   local selected = currentOption or entry.optionName or defaultText
 
-  local button = makeButton(parent, selected, 150, 22, function(anchor)
+  local button = makeButton(parent, selected, width or 150, 22, function(anchor)
     self:OpenAddonOptionDropdown(anchor, profile, addonName)
   end)
   styleButton(button, false)
   addHover(button, false)
-  button:SetPoint("TOPLEFT", 560, y)
+  button:SetPoint("TOPLEFT", x or 560, y)
 end
 
 function ConfigUI:SetAddonOption(profile, addonName, optionName)
@@ -1467,9 +1530,7 @@ function ConfigUI:BuildHelpTab(parent, profile, y)
   y = y - 30
 
   local openQuick = makeButton(parent, "Menu rapido", 130, 24, function(button)
-    if ModeShift.QuickMenu then
-      ModeShift.QuickMenu:Open(button, { forceMenu = true })
-    end
+    self:OpenQuickProfileDropdown(button)
   end)
   openQuick:SetPoint("TOPLEFT", 4, y + 4)
 
@@ -1519,6 +1580,53 @@ function ConfigUI:BuildHelpTab(parent, profile, y)
   end
 
   return y - 10
+end
+
+function ConfigUI:OpenQuickProfileDropdown(anchor)
+  local profiles = ModeShift.ProfileManager and ModeShift.ProfileManager:GetProfilesForCurrentCharacter() or {}
+  local activeProfileId = ModeShift.Database and ModeShift.Database:GetActiveProfileId() or nil
+  local items = {}
+
+  table.sort(profiles, function(left, right)
+    local leftSpec = tostring(left.specName or left.specId or "")
+    local rightSpec = tostring(right.specName or right.specId or "")
+    if leftSpec ~= rightSpec then
+      return leftSpec < rightSpec
+    end
+    local leftType = tostring(left.modeType or "CUSTOM")
+    local rightType = tostring(right.modeType or "CUSTOM")
+    if leftType ~= rightType then
+      return leftType < rightType
+    end
+    return tostring(left.name or left.id) < tostring(right.name or right.id)
+  end)
+
+  local lastGroup = nil
+  for _, profile in ipairs(profiles) do
+    local group = tostring(profile.specName or profile.specId or "Sin spec") .. " - " .. tostring(profile.modeType or "CUSTOM")
+    if group ~= lastGroup then
+      if #items > 0 then
+        table.insert(items, { divider = true })
+      end
+      table.insert(items, { text = group, disabled = true })
+      lastGroup = group
+    end
+
+    local profileId = profile.id
+    table.insert(items, {
+      text = profile.id == activeProfileId and ((profile.name or profile.id) .. " (actual)") or (profile.name or profile.id),
+      selected = profile.id == activeProfileId,
+      onClick = function()
+        ModeShift.ApplyEngine:ApplyProfile(profileId, { source = "help-quick-menu" })
+      end,
+    })
+  end
+
+  if #items == 0 then
+    table.insert(items, { text = "No hay perfiles creados", disabled = true })
+  end
+
+  self:OpenDropdown(anchor, "Menu rapido", items, 320)
 end
 
 function ConfigUI:SerializeProfile(profile)
@@ -1674,12 +1782,23 @@ function ConfigUI:ShowImportExport(title, text, canImport)
     frame.scroll = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
     frame.scroll:SetPoint("TOPLEFT", 16, -42)
     frame.scroll:SetSize(570, 310)
+    frame.scroll.bg = frame.scroll:CreateTexture(nil, "BACKGROUND")
+    frame.scroll.bg:SetPoint("TOPLEFT", -4, 4)
+    frame.scroll.bg:SetPoint("BOTTOMRIGHT", 22, -4)
+    frame.scroll.bg:SetColorTexture(0.03, 0.03, 0.035, 0.96)
 
     frame.editBox = CreateFrame("EditBox", nil, frame.scroll)
     frame.editBox:SetMultiLine(true)
     frame.editBox:SetAutoFocus(false)
     frame.editBox:SetFontObject(ChatFontNormal)
     frame.editBox:SetWidth(540)
+    frame.editBox:EnableMouse(true)
+    if frame.editBox.SetTextInsets then
+      frame.editBox:SetTextInsets(6, 6, 6, 6)
+    end
+    frame.editBox:SetScript("OnMouseDown", function(self)
+      self:SetFocus()
+    end)
     frame.editBox:SetScript("OnEscapePressed", function(self)
       self:ClearFocus()
     end)
@@ -1699,10 +1818,34 @@ function ConfigUI:ShowImportExport(title, text, canImport)
     end)
     frame.importButton:SetPoint("BOTTOMLEFT", 16, 16)
 
+    frame.copyButton = makeButton(frame, "Copiar todo", 110, 24, function()
+      frame.editBox:SetFocus()
+      frame.editBox:HighlightText()
+      if setClipboardText(frame.editBox:GetText()) then
+        ModeShift:Print("perfil copiado al portapapeles.")
+      else
+        ModeShift:Print("texto seleccionado. Pulsa Ctrl+C para copiarlo.")
+      end
+    end)
+    frame.copyButton:SetPoint("LEFT", frame.importButton, "RIGHT", 8, 0)
+
+    frame.pasteButton = makeButton(frame, "Pegar", 110, 24, function()
+      local value = getClipboardText()
+      frame.editBox:SetFocus()
+      if value and value ~= "" then
+        frame.editBox:SetText(value)
+        frame.editBox:SetCursorPosition(0)
+        ModeShift:Print("texto pegado desde el portapapeles.")
+      else
+        ModeShift:Print("cuadro listo. Pulsa Ctrl+V para pegar el codigo.")
+      end
+    end)
+    frame.pasteButton:SetPoint("LEFT", frame.copyButton, "RIGHT", 8, 0)
+
     frame.closeButton = makeButton(frame, "Cerrar", 110, 24, function()
       frame:Hide()
     end)
-    frame.closeButton:SetPoint("LEFT", frame.importButton, "RIGHT", 8, 0)
+    frame.closeButton:SetPoint("LEFT", frame.pasteButton, "RIGHT", 8, 0)
 
     self.importFrame = frame
   end
@@ -1712,7 +1855,15 @@ function ConfigUI:ShowImportExport(title, text, canImport)
   self.importFrame.editBox:SetCursorPosition(0)
   self.importFrame.editBox:SetHeight(300)
   setShown(self.importFrame.importButton, canImport)
+  setShown(self.importFrame.copyButton, not canImport)
+  setShown(self.importFrame.pasteButton, canImport)
   self.importFrame:Show()
+  self.importFrame.editBox:SetFocus()
+  if canImport then
+    self.importFrame.editBox:HighlightText(0, 0)
+  else
+    self.importFrame.editBox:HighlightText()
+  end
 end
 
 ModeShift:RegisterModule("ConfigUI", ConfigUI)

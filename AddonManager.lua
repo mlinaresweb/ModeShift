@@ -2,10 +2,17 @@ local ModeShift = _G.ModeShift
 
 local AddonManager = {
   installedCache = nil,
+  dependencyCache = nil,
 }
 
 local function addonApi()
   return C_AddOns or {}
+end
+
+local function callVararg(fn, ...)
+  local values = { pcall(fn, ...) }
+  local ok = table.remove(values, 1)
+  return ok, values
 end
 
 local function getAddOnInfo(addonName)
@@ -17,6 +24,47 @@ local function getAddOnInfo(addonName)
     return ModeShift:SafeCall("GetAddOnInfo", GetAddOnInfo, addonName)
   end
   return false, nil
+end
+
+local function getAddOnMetadata(addonName, key)
+  local api = addonApi()
+  if api.GetAddOnMetadata then
+    local ok, metadata = ModeShift:SafeCall("GetAddOnMetadata", api.GetAddOnMetadata, addonName, key)
+    if ok then
+      return metadata
+    end
+  end
+  if GetAddOnMetadata then
+    local ok, metadata = ModeShift:SafeCall("GetAddOnMetadata", GetAddOnMetadata, addonName, key)
+    if ok then
+      return metadata
+    end
+  end
+  return nil
+end
+
+local function addUnique(list, value)
+  if not value or value == "" then
+    return
+  end
+  for _, current in ipairs(list) do
+    if current == value then
+      return
+    end
+  end
+  table.insert(list, value)
+end
+
+local function splitMetadataList(value)
+  local list = {}
+  if type(value) ~= "string" then
+    return list
+  end
+  for token in value:gmatch("[^,%s]+") do
+    token = token:gsub("^%s+", ""):gsub("%s+$", "")
+    addUnique(list, token)
+  end
+  return list
 end
 
 function AddonManager:IsInstalled(addonName)
@@ -81,6 +129,14 @@ function AddonManager:IsLoaded(addonName)
   return false
 end
 
+function AddonManager:GetAddonIcon(addonName)
+  local icon = getAddOnMetadata(addonName, "IconTexture") or getAddOnMetadata(addonName, "IconAtlas") or getAddOnMetadata(addonName, "Icon")
+  if icon and icon ~= "" then
+    return icon
+  end
+  return "Interface\\Icons\\INV_Misc_QuestionMark"
+end
+
 function AddonManager:IsLoadOnDemand(addonName)
   local api = addonApi()
   local value
@@ -99,6 +155,81 @@ function AddonManager:IsLoadOnDemand(addonName)
 
   value = value and tostring(value):lower() or nil
   return value == "1" or value == "true"
+end
+
+function AddonManager:GetDependencies(addonName)
+  local dependencies = {}
+  if not addonName or addonName == "" then
+    return dependencies
+  end
+
+  self.dependencyCache = self.dependencyCache or {}
+  if self.dependencyCache[addonName] then
+    local cached = {}
+    for index, dependency in ipairs(self.dependencyCache[addonName]) do
+      cached[index] = dependency
+    end
+    return cached
+  end
+
+  local api = addonApi()
+  if api.GetAddOnDependencies then
+    local ok, values = callVararg(api.GetAddOnDependencies, addonName)
+    if ok then
+      for _, value in ipairs(values) do
+        if type(value) == "table" then
+          for _, dependency in ipairs(value) do
+            if dependency ~= addonName and self:IsInstalled(dependency) then
+              addUnique(dependencies, dependency)
+            end
+          end
+        elseif type(value) == "string" and value ~= addonName and self:IsInstalled(value) then
+          addUnique(dependencies, value)
+        end
+      end
+    end
+  elseif GetAddOnDependencies then
+    local ok, values = callVararg(GetAddOnDependencies, addonName)
+    if ok then
+      for _, value in ipairs(values) do
+        if type(value) == "string" and value ~= addonName and self:IsInstalled(value) then
+          addUnique(dependencies, value)
+        end
+      end
+    end
+  end
+
+  for _, key in ipairs({ "Dependencies", "RequiredDeps", "RequiredDep" }) do
+    for _, dependency in ipairs(splitMetadataList(getAddOnMetadata(addonName, key))) do
+      if dependency ~= addonName and self:IsInstalled(dependency) then
+        addUnique(dependencies, dependency)
+      end
+    end
+  end
+
+  self.dependencyCache[addonName] = {}
+  for index, dependency in ipairs(dependencies) do
+    self.dependencyCache[addonName][index] = dependency
+  end
+
+  return dependencies
+end
+
+function AddonManager:GetRequiredDependents(addonName)
+  local dependents = {}
+  if not addonName or addonName == "" then
+    return dependents
+  end
+
+  for _, addon in ipairs(self:GetInstalledAddons()) do
+    for _, dependency in ipairs(self:GetDependencies(addon.name)) do
+      if dependency == addonName then
+        addUnique(dependents, addon.name)
+      end
+    end
+  end
+
+  return dependents
 end
 
 function AddonManager:SetEnabled(addonName, enabled)
@@ -138,6 +269,7 @@ end
 
 function AddonManager:ClearInstalledCache()
   self.installedCache = nil
+  self.dependencyCache = nil
 end
 
 local function copyAddonList(source)
@@ -146,22 +278,14 @@ local function copyAddonList(source)
     copy[index] = {
       name = addon.name,
       title = addon.title,
+      icon = addon.icon,
       enabled = addon.enabled,
     }
   end
   return copy
 end
 
-function AddonManager:SetProfileAddonState(profile, addonName, shouldLoad)
-  if type(profile) ~= "table" or not addonName or addonName == "" then
-    return
-  end
-
-  profile.addons = ModeShift.Utils:CopyDefaults(profile.addons, { enabled = true, enable = {}, disable = {} })
-  profile.addons.enabled = true
-  profile.addons.enable = ModeShift.Utils:SafeArray(profile.addons.enable)
-  profile.addons.disable = ModeShift.Utils:SafeArray(profile.addons.disable)
-
+function AddonManager:SetProfileAddonStateExact(profile, addonName, shouldLoad)
   for index = #profile.addons.enable, 1, -1 do
     if profile.addons.enable[index] == addonName then
       table.remove(profile.addons.enable, index)
@@ -184,6 +308,46 @@ function AddonManager:SetProfileAddonState(profile, addonName, shouldLoad)
   end
 end
 
+function AddonManager:SetProfileAddonState(profile, addonName, shouldLoad)
+  if type(profile) ~= "table" or not addonName or addonName == "" then
+    return
+  end
+
+  profile.addons = ModeShift.Utils:CopyDefaults(profile.addons, { enabled = true, enable = {}, disable = {} })
+  profile.addons.enabled = true
+  profile.addons.enable = ModeShift.Utils:SafeArray(profile.addons.enable)
+  profile.addons.disable = ModeShift.Utils:SafeArray(profile.addons.disable)
+
+  local visited = {}
+  local function enableWithDependencies(name)
+    if visited[name] then
+      return
+    end
+    visited[name] = true
+    self:SetProfileAddonStateExact(profile, name, true)
+    for _, dependency in ipairs(self:GetDependencies(name)) do
+      enableWithDependencies(dependency)
+    end
+  end
+
+  local function disableWithDependents(name)
+    if visited[name] then
+      return
+    end
+    visited[name] = true
+    self:SetProfileAddonStateExact(profile, name, false)
+    for _, dependent in ipairs(self:GetRequiredDependents(name)) do
+      disableWithDependents(dependent)
+    end
+  end
+
+  if shouldLoad then
+    enableWithDependencies(addonName)
+  else
+    disableWithDependents(addonName)
+  end
+end
+
 function AddonManager:ShouldLoadInProfile(profile, addon)
   local addonName = type(addon) == "table" and addon.name or addon
   local addons = profile and profile.addons or nil
@@ -201,6 +365,27 @@ function AddonManager:ShouldLoadInProfile(profile, addon)
       return true
     end
   end
+
+  local visited = {}
+  local function enabledAddonRequires(name)
+    if visited[name] then
+      return false
+    end
+    visited[name] = true
+    for _, dependency in ipairs(self:GetDependencies(name)) do
+      if dependency == addonName or enabledAddonRequires(dependency) then
+        return true
+      end
+    end
+    return false
+  end
+
+  for _, name in ipairs(ModeShift.Utils:SafeArray(addons.enable)) do
+    if enabledAddonRequires(name) then
+      return true
+    end
+  end
+
   return false
 end
 
@@ -266,7 +451,7 @@ function AddonManager:GetInstalledAddons(forceRefresh)
   for index = 1, count do
     local ok, name, title = getAddOnInfo(index)
     if ok and name and name ~= ModeShift.addonName then
-      table.insert(addons, { name = name, title = title or name, enabled = self:IsEnabled(name) })
+      table.insert(addons, { name = name, title = title or name, icon = self:GetAddonIcon(name), enabled = self:IsEnabled(name) })
     end
   end
 
