@@ -58,6 +58,49 @@ function AddonManager:IsEnabled(addonName)
   return false
 end
 
+function AddonManager:IsLoaded(addonName)
+  if not addonName or addonName == "" then
+    return false
+  end
+
+  local api = addonApi()
+  if api.IsAddOnLoaded then
+    local ok, loaded = ModeShift:SafeCall("IsAddOnLoaded", api.IsAddOnLoaded, addonName)
+    if ok then
+      return loaded and true or false
+    end
+  end
+
+  if IsAddOnLoaded then
+    local ok, loaded = ModeShift:SafeCall("IsAddOnLoaded", IsAddOnLoaded, addonName)
+    if ok then
+      return loaded and true or false
+    end
+  end
+
+  return false
+end
+
+function AddonManager:IsLoadOnDemand(addonName)
+  local api = addonApi()
+  local value
+
+  if api.GetAddOnMetadata then
+    local ok, metadata = ModeShift:SafeCall("GetAddOnMetadata", api.GetAddOnMetadata, addonName, "LoadOnDemand")
+    if ok then
+      value = metadata
+    end
+  elseif GetAddOnMetadata then
+    local ok, metadata = ModeShift:SafeCall("GetAddOnMetadata", GetAddOnMetadata, addonName, "LoadOnDemand")
+    if ok then
+      value = metadata
+    end
+  end
+
+  value = value and tostring(value):lower() or nil
+  return value == "1" or value == "true"
+end
+
 function AddonManager:SetEnabled(addonName, enabled)
   if addonName == ModeShift.addonName and not enabled then
     return false, "ModeShift no puede desactivarse a si mismo"
@@ -241,6 +284,7 @@ function AddonManager:Apply(profile)
   end
 
   local changed = {}
+  local needsSessionReload = {}
   local installed = self:GetInstalledAddons(true)
   for _, addon in ipairs(installed) do
     local shouldLoad = self:ShouldLoadInProfile(profile, addon)
@@ -254,6 +298,9 @@ function AddonManager:Apply(profile)
           table.insert(result.errors, "No se pudo activar " .. addon.name .. ": " .. tostring(err))
         end
       end
+      if addon.name ~= ModeShift.addonName and not self:IsLoadOnDemand(addon.name) and not self:IsLoaded(addon.name) then
+        table.insert(needsSessionReload, addon.name)
+      end
     else
       if self:IsEnabled(addon.name) then
         local ok, err = self:SetEnabled(addon.name, false)
@@ -264,12 +311,19 @@ function AddonManager:Apply(profile)
           table.insert(result.errors, "No se pudo desactivar " .. addon.name .. ": " .. tostring(err))
         end
       end
+      if addon.name ~= ModeShift.addonName and self:IsLoaded(addon.name) then
+        table.insert(needsSessionReload, addon.name)
+      end
     end
   end
 
   if #changed > 0 then
     result.requiresReload = true
     result.message = "Addons modificados: " .. table.concat(changed, ", ")
+    table.insert(result.applied, result.message)
+  elseif #needsSessionReload > 0 then
+    result.requiresReload = true
+    result.message = "Addons pendientes de cargar: " .. table.concat(needsSessionReload, ", ")
     table.insert(result.applied, result.message)
   else
     result.message = "Addons sin cambios"

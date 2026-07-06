@@ -72,6 +72,14 @@ function ModeShift:GetCurrentSpecId()
     end
   end
 
+  if C_SpecializationInfo and C_SpecializationInfo.GetSpecialization and C_SpecializationInfo.GetSpecializationInfo then
+    local specIndex = C_SpecializationInfo.GetSpecialization()
+    if specIndex then
+      local specId = C_SpecializationInfo.GetSpecializationInfo(specIndex)
+      return specId
+    end
+  end
+
   return nil
 end
 
@@ -80,6 +88,14 @@ function ModeShift:GetCurrentSpecName()
     local specIndex = GetSpecialization()
     if specIndex then
       local _, specName = GetSpecializationInfo(specIndex)
+      return specName
+    end
+  end
+
+  if C_SpecializationInfo and C_SpecializationInfo.GetSpecialization and C_SpecializationInfo.GetSpecializationInfo then
+    local specIndex = C_SpecializationInfo.GetSpecialization()
+    if specIndex then
+      local _, specName = C_SpecializationInfo.GetSpecializationInfo(specIndex)
       return specName
     end
   end

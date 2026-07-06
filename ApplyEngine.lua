@@ -235,6 +235,21 @@ function ApplyEngine:ApplyProfile(profileId, options)
     return pending
   end
 
+  if ModeShift.SpecManager and ModeShift.SpecManager:ProfileNeedsSpecSwitch(profile, options) then
+    local result = self:NewResult(profileId)
+    local switched, err = ModeShift.SpecManager:SwitchForProfile(profile, options)
+    if switched then
+      table.insert(result.applied, "Cambio de spec: " .. tostring(profile.specName or profile.specId))
+      table.insert(result.skipped, "El resto del perfil se aplicara al terminar el cambio de spec")
+      return result
+    end
+
+    result.success = false
+    table.insert(result.errors, "No se pudo cambiar de spec: " .. tostring(err or "error desconocido"))
+    self:PrintSummary(result)
+    return result
+  end
+
   local result = self:NewResult(profileId)
   local talentsChanged = false
   local previousProfile = nil
@@ -255,6 +270,13 @@ function ApplyEngine:ApplyProfile(profileId, options)
     local talentResult = ModeShift.TalentManager:Apply(profile)
     talentsChanged = hasAppliedWork(talentResult)
     self:MergeResult(result, talentResult)
+    if talentResult and talentResult.pendingRetry then
+      self:PrintSummary(result)
+      if ModeShift.RefreshConfig then
+        ModeShift:RefreshConfig()
+      end
+      return result
+    end
   end
 
   self:ApplyEditMode(profile, result)

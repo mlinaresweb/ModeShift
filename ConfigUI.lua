@@ -703,7 +703,10 @@ function ConfigUI:RefreshProfileList()
 
   for _, profile in ipairs(profiles) do
     local name = profile.name or "Perfil"
-    local selected = profile.id == activeProfileId
+    if profile.id == activeProfileId then
+      name = name .. "  |cff55ff55(activo)|r"
+    end
+    local selected = profile.id == self.selectedProfileId
     local button = makeButton(child, name, 210, 26, function()
       self.selectedProfileId = profile.id
       self:Refresh()

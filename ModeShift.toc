@@ -16,6 +16,7 @@ Utils.lua
 Database.lua
 ProfileManager.lua
 EquipmentManager.lua
+SpecManager.lua
 TalentManager.lua
 EditModeManager.lua
 AddonManager.lua

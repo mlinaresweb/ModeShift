@@ -9,6 +9,19 @@ local function lower(value)
   return string.lower(value)
 end
 
+local function loadResultIsReady(loadResult)
+  if loadResult == nil then
+    return true
+  end
+
+  if type(loadResult) == "number" then
+    return loadResult == 1 or loadResult == 3
+  end
+
+  local text = tostring(loadResult)
+  return text == "NoChangesNecessary" or text == "Ready"
+end
+
 function TalentManager:GetConfigName(configId)
   if configId and C_Traits and C_Traits.GetConfigInfo then
     local ok, info = ModeShift:SafeCall("GetConfigInfo", C_Traits.GetConfigInfo, configId)
@@ -17,6 +30,70 @@ function TalentManager:GetConfigName(configId)
     end
   end
   return nil
+end
+
+function TalentManager:GetSpellCooldownRemaining(spellId)
+  if not spellId then
+    return 0
+  end
+
+  if C_Spell and C_Spell.GetSpellCooldown then
+    local ok, cooldownInfo = ModeShift:SafeCall("GetSpellCooldown", C_Spell.GetSpellCooldown, spellId)
+    if ok and type(cooldownInfo) == "table" then
+      if cooldownInfo.isOnGCD then
+        return 0
+      end
+
+      local startTime = cooldownInfo.startTime or cooldownInfo.start or 0
+      local duration = cooldownInfo.duration or 0
+      if duration > 1.5 and startTime > 0 then
+        return math.max(0, startTime + duration - GetTime())
+      end
+    end
+  end
+
+  if GetSpellCooldown then
+    local ok, startTime, duration = ModeShift:SafeCall("GetSpellCooldown", GetSpellCooldown, spellId)
+    if ok and duration and duration > 1.5 and startTime and startTime > 0 then
+      return math.max(0, startTime + duration - GetTime())
+    end
+  end
+
+  return 0
+end
+
+function TalentManager:GetBlockingCooldown(spellIds)
+  local longest = 0
+  for _, spellId in ipairs(ModeShift.Utils:SafeArray(spellIds)) do
+    local remaining = self:GetSpellCooldownRemaining(spellId)
+    if remaining > longest then
+      longest = remaining
+    end
+  end
+  return longest
+end
+
+function TalentManager:ScheduleProfileRetry(profile, delay)
+  if not (profile and profile.id and ModeShift.ApplyEngine and C_Timer and C_Timer.After) then
+    return
+  end
+
+  self.retryCounts = self.retryCounts or {}
+  local attempts = (self.retryCounts[profile.id] or 0) + 1
+  self.retryCounts[profile.id] = attempts
+  if attempts > 6 then
+    ModeShift:Print("|cffffff66!|r no he podido aplicar talentos tras esperar cooldowns. Reintentalo cuando no haya habilidades en reutilizacion.")
+    self.retryCounts[profile.id] = nil
+    return
+  end
+
+  delay = math.max(1.0, math.min(delay or 1.0, 120)) + 0.4
+  ModeShift:Print("talentos esperando cooldown: reintentare " .. tostring(profile.name or profile.id) .. " en " .. string.format("%.1f", delay) .. "s.")
+  C_Timer.After(delay, function()
+    if ModeShift.ApplyEngine then
+      ModeShift.ApplyEngine:ApplyProfile(profile.id, { source = "talent-cooldown-retry", afterTalentCooldown = true })
+    end
+  end)
 end
 
 function TalentManager:GetActiveTraitConfigId()
@@ -370,8 +447,29 @@ function TalentManager:Apply(profile)
     return result
   end
 
-  local ok, err = ModeShift:SafeCall("LoadConfig", C_ClassTalents.LoadConfig, loadout.id, talents.autoApply ~= false)
+  local ok, loadResult, loadErr, affectedSpellIds = ModeShift:SafeCall("LoadConfig", C_ClassTalents.LoadConfig, loadout.id, talents.autoApply ~= false)
   if ok then
+    if not loadResultIsReady(loadResult) then
+      local cooldown = self:GetBlockingCooldown(affectedSpellIds)
+      if cooldown <= 0 and loadResult == 2 then
+        cooldown = 1.0
+      end
+
+      if cooldown > 0 then
+        result.pendingRetry = true
+        table.insert(result.warnings, "Talentos bloqueados por cooldown")
+        self:ScheduleProfileRetry(profile, cooldown)
+        return result
+      end
+
+      result.success = false
+      table.insert(result.errors, "No se pudo aplicar talentos: " .. tostring(loadErr or loadResult))
+      return result
+    end
+
+    if self.retryCounts then
+      self.retryCounts[profile.id] = nil
+    end
     self.pendingConfigId = loadout.id
     self.pendingConfigName = loadout.name
     self:SetSelectedLoadoutId(currentSpecId, loadout.id)
@@ -384,7 +482,7 @@ function TalentManager:Apply(profile)
     end
   else
     result.success = false
-    table.insert(result.errors, "No se pudo aplicar talentos: " .. tostring(err))
+    table.insert(result.errors, "No se pudo aplicar talentos: " .. tostring(loadResult))
   end
 
   return result
