@@ -219,6 +219,102 @@ function ModeShift:OpenConfig()
   self.ConfigFrame:Show()
 end
 
+function ModeShift:ShowConfig()
+  if self.ConfigUI then
+    self.ConfigUI:Open()
+    return
+  end
+
+  self:OpenConfig()
+end
+
+function ModeShift:BuildOptionsPanel(panel)
+  if panel.modeShiftBuilt then
+    return
+  end
+  panel.modeShiftBuilt = true
+
+  local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
+  title:SetPoint("TOPLEFT", 24, -24)
+  title:SetText("ModeShift")
+
+  local version = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+  version:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -12)
+  version:SetText("Version: " .. tostring(self.version or "0.1.0"))
+
+  local description = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+  description:SetPoint("TOPLEFT", version, "BOTTOMLEFT", 0, -18)
+  description:SetWidth(620)
+  description:SetJustifyH("LEFT")
+  description:SetText("Gestiona perfiles de spec, equipo, talentos, UI, addons, perfiles internos de addons y CVars.")
+
+  local openButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+  openButton:SetSize(220, 28)
+  openButton:SetPoint("TOPLEFT", description, "BOTTOMLEFT", 0, -24)
+  openButton:SetText("Abrir ModeShift")
+  openButton:SetScript("OnClick", function()
+    ModeShift:ShowConfig()
+  end)
+
+  local quickButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
+  quickButton:SetSize(180, 28)
+  quickButton:SetPoint("LEFT", openButton, "RIGHT", 10, 0)
+  quickButton:SetText("Menu rapido")
+  quickButton:SetScript("OnClick", function(button)
+    if ModeShift.QuickMenu then
+      ModeShift.QuickMenu:Open(button, { forceMenu = true })
+    end
+  end)
+
+  local commands = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+  commands:SetPoint("TOPLEFT", openButton, "BOTTOMLEFT", 0, -28)
+  commands:SetText("Comandos principales")
+
+  local body = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+  body:SetPoint("TOPLEFT", commands, "BOTTOMLEFT", 0, -10)
+  body:SetWidth(620)
+  body:SetJustifyH("LEFT")
+  body:SetText("/ms config - abrir configuracion\n/ms quick - menu rapido\n/ms current - perfil actual\n/ms reload - recargar interfaz\n/ms doctor - diagnostico rapido")
+end
+
+function ModeShift:RegisterOptionsPanel()
+  if self.optionsPanel then
+    return
+  end
+
+  local panel = CreateFrame("Frame", "ModeShiftOptionsPanel")
+  panel.name = "ModeShift"
+  panel:SetScript("OnShow", function()
+    ModeShift:BuildOptionsPanel(panel)
+  end)
+  self.optionsPanel = panel
+
+  if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory then
+    local category = Settings.RegisterCanvasLayoutCategory(panel, "ModeShift")
+    Settings.RegisterAddOnCategory(category)
+    self.optionsCategory = category
+  elseif InterfaceOptions_AddCategory then
+    InterfaceOptions_AddCategory(panel)
+  end
+end
+
+function ModeShift:OpenAddonOptions()
+  if not self.optionsPanel then
+    self:RegisterOptionsPanel()
+  end
+
+  if Settings and Settings.OpenToCategory and self.optionsCategory then
+    local categoryId = self.optionsCategory.ID
+    if not categoryId and self.optionsCategory.GetID then
+      categoryId = self.optionsCategory:GetID()
+    end
+    Settings.OpenToCategory(categoryId or self.optionsCategory)
+  elseif InterfaceOptionsFrame_OpenToCategory and self.optionsPanel then
+    InterfaceOptionsFrame_OpenToCategory(self.optionsPanel)
+    InterfaceOptionsFrame_OpenToCategory(self.optionsPanel)
+  end
+end
+
 function ModeShift:RefreshConfig()
   if self.ConfigUI then
     self.ConfigUI:Refresh()
@@ -268,10 +364,6 @@ function ModeShift:OnPlayerLogin()
     end
   end
 
-  if self.ProfileManager then
-    self.ProfileManager:EnsureExampleProfiles()
-  end
-
   if self.Minimap then
     self.Minimap:Initialize()
   end
@@ -279,6 +371,8 @@ function ModeShift:OnPlayerLogin()
   if self.SlashCommands then
     self.SlashCommands:Register()
   end
+
+  self:RegisterOptionsPanel()
 
   self:Print("cargado. Usa /ms list para ver perfiles.")
 end
@@ -311,10 +405,6 @@ function ModeShift:OnEvent(event, ...)
     self:OnPlayerLogin()
   elseif event == "PLAYER_REGEN_ENABLED" then
     self:OnPlayerRegenEnabled()
-  elseif event == "PLAYER_SPECIALIZATION_CHANGED" or event == "ACTIVE_PLAYER_SPECIALIZATION_CHANGED" then
-    if self.ProfileManager then
-      self.ProfileManager:EnsureExampleProfiles()
-    end
   end
 
   for _, module in pairs(self.modules) do

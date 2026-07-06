@@ -10,16 +10,100 @@ local function addButton(root, text, callback)
   end
 end
 
-local function profileReloadHint(profile)
-  local addons = profile and profile.addons
-  if addons and addons.enabled and (#ModeShift.Utils:SafeArray(addons.enable) > 0 or #ModeShift.Utils:SafeArray(addons.disable) > 0) then
-    return " [reload]"
+local function addTitle(root, text)
+  if root.CreateTitle then
+    root:CreateTitle(text)
+  elseif root.CreateButton then
+    root:CreateButton(text, function() end)
   end
-  return ""
 end
 
 local function selectedProfileText(profile)
-  return "|cffff4a35" .. tostring(profile.name or profile.id or "Perfil") .. "|r"
+  return "|cffff4a35" .. tostring(profile.name or profile.id or "Perfil") .. " (actual)|r"
+end
+
+local TYPE_ORDER = {
+  PVP = 10,
+  ARENA = 20,
+  BLITZ = 30,
+  PVE = 40,
+  MYTHIC_PLUS = 50,
+  RAID = 60,
+  FARMING = 70,
+  CUSTOM = 100,
+}
+
+local TYPE_LABELS = {
+  MYTHIC_PLUS = "M+",
+  CUSTOM = "Custom",
+}
+
+local function modeTypeLabel(modeType)
+  modeType = modeType or "CUSTOM"
+  return TYPE_LABELS[modeType] or modeType
+end
+
+local function sortProfiles(left, right)
+  local leftOrder = left.order or 0
+  local rightOrder = right.order or 0
+  if leftOrder == rightOrder then
+    return tostring(left.name or left.id) < tostring(right.name or right.id)
+  end
+  return leftOrder < rightOrder
+end
+
+local function sortTypeGroups(left, right)
+  local leftOrder = TYPE_ORDER[left.modeType] or 999
+  local rightOrder = TYPE_ORDER[right.modeType] or 999
+  if leftOrder == rightOrder then
+    return tostring(left.modeType) < tostring(right.modeType)
+  end
+  return leftOrder < rightOrder
+end
+
+local function buildTypeGroups(profiles)
+  local map = {}
+  local groups = {}
+
+  for _, profile in ipairs(profiles or {}) do
+    local modeType = profile.modeType or "CUSTOM"
+    local group = map[modeType]
+    if not group then
+      group = { modeType = modeType, profiles = {} }
+      map[modeType] = group
+      table.insert(groups, group)
+    end
+    table.insert(group.profiles, profile)
+  end
+
+  table.sort(groups, sortTypeGroups)
+  for _, group in ipairs(groups) do
+    table.sort(group.profiles, sortProfiles)
+  end
+
+  return groups
+end
+
+local function addProfileButton(root, profile, activeProfileId)
+  local profileValue = profile
+  local name = profile.id == activeProfileId and selectedProfileText(profile) or (profile.name or profile.id)
+  addButton(root, name, function()
+    ModeShift.ApplyEngine:ApplyProfile(profileValue.id, { source = "quick-menu" })
+  end)
+end
+
+local function addTypedProfileGroups(root, profiles, activeProfileId)
+  local typeGroups = buildTypeGroups(profiles)
+
+  for index, typeGroup in ipairs(typeGroups) do
+    if index > 1 and root.CreateDivider then
+      root:CreateDivider()
+    end
+    addTitle(root, modeTypeLabel(typeGroup.modeType))
+    for _, profile in ipairs(typeGroup.profiles) do
+      addProfileButton(root, profile, activeProfileId)
+    end
+  end
 end
 
 function QuickMenu:GetProfiles()
@@ -46,12 +130,7 @@ function QuickMenu:Open(anchor, options)
   local profiles = self:GetProfiles()
 
   if #profiles == 0 then
-    if options.forceMenu then
-      ModeShift:Print("no hay perfiles. Usa /ms create para crear ejemplos.")
-    elseif ModeShift.ProfileManager then
-      ModeShift.ProfileManager:EnsureExampleProfiles()
-      ModeShift:Print("he creado perfiles de ejemplo. Usa /ms list para verlos.")
-    end
+    ModeShift:Print("no hay perfiles. Abre la configuracion y pulsa Nuevo, o usa /ms create si quieres ejemplos.")
     return
   end
 
@@ -71,8 +150,6 @@ function QuickMenu:Open(anchor, options)
   if MenuUtil and MenuUtil.CreateContextMenu and anchor then
     MenuUtil.CreateContextMenu(anchor, function(_, root)
       local activeProfileId = ModeShift.Database:GetActiveProfileId()
-      local currentSpecId = ModeShift:GetCurrentSpecId()
-      local preferred = ModeShift.Database:GetPreferredProfileForSpec(currentSpecId)
       local grouped = ModeShift.ProfileManager:GetEnabledProfilesBySpec()
       local groupCount = 0
       for _ in pairs(grouped) do
@@ -80,25 +157,19 @@ function QuickMenu:Open(anchor, options)
       end
 
       if groupCount <= 1 then
-        for _, profile in ipairs(profiles) do
-          local profileValue = profile
-          local name = profile.id == activeProfileId and selectedProfileText(profile) or (profile.name or profile.id)
-          local suffix = profile.id == preferred and " (recomendado)" or ""
-          addButton(root, name .. suffix .. profileReloadHint(profile), function()
-            ModeShift.ApplyEngine:ApplyProfile(profileValue.id, { source = "quick-menu" })
-          end)
-        end
+        addTypedProfileGroups(root, profiles, activeProfileId)
       else
+        local specGroups = {}
         for _, group in pairs(grouped) do
+          table.insert(specGroups, group)
+        end
+        table.sort(specGroups, function(left, right)
+          return tostring(left.specName or left.specId or "") < tostring(right.specName or right.specId or "")
+        end)
+
+        for _, group in ipairs(specGroups) do
           local submenu = root:CreateButton(group.specName or tostring(group.specId or "Sin spec"))
-          for _, profile in ipairs(group.profiles) do
-            local profileValue = profile
-            local name = profile.id == activeProfileId and selectedProfileText(profile) or (profile.name or profile.id)
-            local suffix = profile.id == preferred and " (recomendado)" or ""
-            submenu:CreateButton(name .. suffix .. profileReloadHint(profile), function()
-              ModeShift.ApplyEngine:ApplyProfile(profileValue.id, { source = "quick-menu" })
-            end)
-          end
+          addTypedProfileGroups(submenu, group.profiles, activeProfileId)
         end
       end
 

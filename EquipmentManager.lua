@@ -27,6 +27,27 @@ function EquipmentManager:GetEquipmentSets()
   return sets
 end
 
+function EquipmentManager:GetCurrentEquipmentSet()
+  for _, set in ipairs(self:GetEquipmentSets()) do
+    if set.id then
+      local equipped
+      if C_EquipmentSet and C_EquipmentSet.GetEquipmentSetInfo then
+        local ok, _, _, _, isEquipped = ModeShift:SafeCall("GetEquipmentSetInfo", C_EquipmentSet.GetEquipmentSetInfo, set.id)
+        equipped = ok and isEquipped
+      elseif GetEquipmentSetInfo then
+        local ok, _, _, _, isEquipped = ModeShift:SafeCall("GetEquipmentSetInfo", GetEquipmentSetInfo, set.id)
+        equipped = ok and isEquipped
+      end
+
+      if equipped then
+        return set
+      end
+    end
+  end
+
+  return nil
+end
+
 function EquipmentManager:FindSet(equipment)
   equipment = equipment or {}
   local sets = self:GetEquipmentSets()

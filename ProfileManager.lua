@@ -122,8 +122,100 @@ function ProfileManager:CreateProfileFromCurrentState(name, modeType)
     cvars = { enabled = false, values = {} },
   })
 
-  self:CaptureCurrentAddons(profile)
+  self:CaptureCurrentState(profile)
   self:SaveProfile(profile)
+
+  return profile
+end
+
+function ProfileManager:CaptureCurrentEquipment(profile)
+  if type(profile) ~= "table" then
+    return profile
+  end
+
+  profile.equipment = ModeShift.Utils:CopyDefaults(profile.equipment, { enabled = false, setId = nil, setName = nil })
+  local set = ModeShift.EquipmentManager and ModeShift.EquipmentManager:GetCurrentEquipmentSet() or nil
+  if set then
+    profile.equipment.enabled = true
+    profile.equipment.setId = set.id
+    profile.equipment.setName = set.name
+  else
+    profile.equipment.enabled = false
+    profile.equipment.setId = nil
+    profile.equipment.setName = nil
+  end
+
+  return profile
+end
+
+function ProfileManager:CaptureCurrentTalents(profile)
+  if type(profile) ~= "table" then
+    return profile
+  end
+
+  profile.talents = ModeShift.Utils:CopyDefaults(profile.talents, { enabled = false, configId = nil, configName = nil, autoApply = true })
+  local loadout = ModeShift.TalentManager and ModeShift.TalentManager:GetCurrentLoadout(ModeShift:GetCurrentSpecId()) or nil
+  if loadout then
+    profile.talents.enabled = true
+    profile.talents.configId = loadout.id
+    profile.talents.configName = loadout.name
+    profile.talents.autoApply = profile.talents.autoApply ~= false
+  else
+    profile.talents.enabled = false
+    profile.talents.configId = nil
+    profile.talents.configName = nil
+  end
+
+  return profile
+end
+
+function ProfileManager:CaptureCurrentEditMode(profile)
+  if type(profile) ~= "table" then
+    return profile
+  end
+
+  profile.editMode = ModeShift.Utils:CopyDefaults(profile.editMode, { enabled = false, layoutId = nil, layoutName = nil })
+  local layout = ModeShift.EditModeManager and ModeShift.EditModeManager:GetCurrentLayout() or nil
+  if layout then
+    profile.editMode.enabled = true
+    profile.editMode.layoutId = layout.id
+    profile.editMode.layoutName = layout.name
+  else
+    profile.editMode.enabled = false
+    profile.editMode.layoutId = nil
+    profile.editMode.layoutName = nil
+  end
+
+  return profile
+end
+
+function ProfileManager:CaptureCurrentState(profile)
+  if type(profile) ~= "table" then
+    return profile
+  end
+
+  profile.classFile = ModeShift:GetClassFile()
+  profile.specId = ModeShift:GetCurrentSpecId()
+  profile.specName = ModeShift:GetCurrentSpecName()
+  self:CaptureCurrentEquipment(profile)
+  self:CaptureCurrentTalents(profile)
+  self:CaptureCurrentEditMode(profile)
+  self:CaptureCurrentAddons(profile)
+  self:CaptureCurrentAddonProfiles(profile)
+  return profile
+end
+
+function ProfileManager:UseProfileNow(profile)
+  profile = self:SaveProfile(profile)
+  if not profile then
+    return nil
+  end
+
+  ModeShift.Database:SetActiveProfileId(profile.id)
+  ModeShift.Database:SetLastAppliedProfileId(profile.id)
+  if profile.specId then
+    ModeShift.Database:SetPreferredProfileForSpec(profile.specId, profile.id)
+  end
 
   return profile
 end
@@ -158,7 +250,7 @@ function ProfileManager:CaptureCurrentAddonProfiles(profile)
 
   profile.addonProfiles = ModeShift.Utils:CopyDefaults(profile.addonProfiles, { enabled = true, entries = {} })
   profile.addonProfiles.enabled = true
-  profile.addonProfiles.entries = profile.addonProfiles.entries or {}
+  profile.addonProfiles.entries = {}
 
   for _, addon in ipairs(ModeShift.AddonManager:GetInstalledAddons(true)) do
     local currentProfile = ModeShift.AddonProfileManager:GetCurrentProfile(addon.name)

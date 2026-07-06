@@ -12,6 +12,7 @@ local TABS = {
   { key = "ui", text = "UI" },
   { key = "addons", text = "Addons" },
   { key = "cvars", text = "Avanzado" },
+  { key = "help", text = "Ayuda" },
 }
 
 local MODE_TYPES = {
@@ -23,6 +24,23 @@ local MODE_TYPES = {
   "BLITZ",
   "FARMING",
   "CUSTOM",
+}
+
+local HELP_COMMANDS = {
+  { command = "/ms config", text = "Abrir o cerrar la configuracion" },
+  { command = "/ms quick", text = "Mostrar el menu rapido en el chat" },
+  { command = "/ms list", text = "Listar perfiles disponibles" },
+  { command = "/ms current", text = "Ver el perfil activo" },
+  { command = "/ms apply <profileId>", text = "Aplicar un perfil por ID interno" },
+  { command = "/ms reapply", text = "Reaplicar el perfil activo" },
+  { command = "/ms create", text = "Crear perfiles de ejemplo para la spec actual" },
+  { command = "/ms set equipment <profileId> <nombre>", text = "Asignar set de equipo por nombre" },
+  { command = "/ms set talents <profileId> <nombre>", text = "Asignar loadout de talentos por nombre" },
+  { command = "/ms addon <profileId> enable|disable <addonName>", text = "Forzar addon activo o desactivado en un perfil" },
+  { command = "/ms addons", text = "Listar addons instalados" },
+  { command = "/ms doctor", text = "Mostrar diagnostico rapido" },
+  { command = "/ms reload", text = "Recargar interfaz cuando haya cambios de addons" },
+  { command = "/ms debug", text = "Activar o desactivar mensajes de debug" },
 }
 
 local function makeButton(parent, text, width, height, onClick)
@@ -292,15 +310,13 @@ function ConfigUI:Initialize()
   end)
   frame.deleteButton:SetPoint("LEFT", frame.duplicateButton, "RIGHT", 4, 0)
 
-  frame.applyButton = makeButton(frame, "Aplicar perfil", 120, 24, function()
-    if self.selectedProfileId then
-      ModeShift.ApplyEngine:ApplyProfile(self.selectedProfileId, { source = "config" })
-    end
+  frame.applyButton = makeButton(frame, "Guardar y usar", 120, 24, function()
+    self:CaptureSelectedProfile(true)
   end)
   frame.applyButton:SetPoint("TOPLEFT", frame.newButton, "BOTTOMLEFT", 0, -8)
 
-  frame.reapplyButton = makeButton(frame, "Reaplicar", 120, 24, function()
-    ModeShift.ApplyEngine:ReapplyCurrentProfile()
+  frame.reapplyButton = makeButton(frame, "Actualizar perfil", 120, 24, function()
+    self:CaptureSelectedProfile(false)
   end)
   frame.reapplyButton:SetPoint("LEFT", frame.applyButton, "RIGHT", 6, 0)
 
@@ -659,6 +675,26 @@ function ConfigUI:SaveProfile(profile)
   self:Refresh()
 end
 
+function ConfigUI:CaptureSelectedProfile(useNow)
+  local profile = self:GetSelectedProfile()
+  if not profile then
+    ModeShift:Print("no hay ningun perfil seleccionado.")
+    return
+  end
+
+  ModeShift.ProfileManager:CaptureCurrentState(profile)
+  if useNow then
+    ModeShift.ProfileManager:UseProfileNow(profile)
+    ModeShift:Print("perfil guardado y marcado como actual: " .. tostring(profile.name or profile.id))
+  else
+    ModeShift.ProfileManager:SaveProfile(profile)
+    ModeShift:Print("perfil actualizado desde el estado actual: " .. tostring(profile.name or profile.id))
+  end
+
+  self.selectedProfileId = profile.id
+  self:Refresh()
+end
+
 function ConfigUI:Refresh()
   if not self.frame then
     return
@@ -780,6 +816,12 @@ function ConfigUI:RefreshEditor()
 
   local profile = self:GetSelectedProfile()
   if not profile then
+    if self.activeTab == "help" then
+      local y = self:BuildHelpTab(child, {}, -8)
+      child:SetHeight(math.max(1, -y + 30))
+      return
+    end
+
     local text = makeText(child, "Crea o selecciona un perfil para empezar.", "GameFontNormal")
     text:SetPoint("TOPLEFT", 4, -8)
     child:SetHeight(80)
@@ -799,6 +841,8 @@ function ConfigUI:RefreshEditor()
     y = self:BuildAddonsTab(child, profile, y)
   elseif self.activeTab == "cvars" then
     y = self:BuildCVarsTab(child, profile, y)
+  elseif self.activeTab == "help" then
+    y = self:BuildHelpTab(child, profile, y)
   end
 
   child:SetHeight(math.max(1, -y + 30))
@@ -1411,6 +1455,70 @@ function ConfigUI:BuildCVarsTab(parent, profile, y)
   end
 
   return y
+end
+
+function ConfigUI:BuildHelpTab(parent, profile, y)
+  profile = profile or {}
+  y = self:AddSection(parent, "Ayuda de ModeShift", y)
+
+  local summary = makeText(parent, "Perfil seleccionado: " .. tostring(profile.name or profile.id or "ninguno"), "GameFontHighlight")
+  summary:SetPoint("TOPLEFT", 4, y)
+  summary:SetWidth(560)
+  y = y - 30
+
+  local openQuick = makeButton(parent, "Menu rapido", 130, 24, function(button)
+    if ModeShift.QuickMenu then
+      ModeShift.QuickMenu:Open(button, { forceMenu = true })
+    end
+  end)
+  openQuick:SetPoint("TOPLEFT", 4, y + 4)
+
+  local openOptions = makeButton(parent, "Opciones de AddOns", 150, 24, function()
+    if ModeShift.OpenAddonOptions then
+      ModeShift:OpenAddonOptions()
+    end
+  end)
+  openOptions:SetPoint("LEFT", openQuick, "RIGHT", 8, 0)
+
+  local reloadButton = makeButton(parent, "Reload UI", 110, 24, function()
+    if ModeShift.Database then
+      ModeShift.Database:SetRequiresReload(false)
+    end
+    ReloadUI()
+  end)
+  reloadButton:SetPoint("LEFT", openOptions, "RIGHT", 8, 0)
+  y = y - 42
+
+  y = self:AddSection(parent, "Comandos", y)
+  for _, item in ipairs(HELP_COMMANDS) do
+    local command = makeText(parent, item.command, "GameFontNormalSmall")
+    command:SetPoint("TOPLEFT", 4, y)
+    command:SetWidth(250)
+
+    local text = makeText(parent, item.text)
+    text:SetPoint("TOPLEFT", 270, y)
+    text:SetWidth(390)
+    y = y - 24
+  end
+
+  y = y - 8
+  y = self:AddSection(parent, "Flujo recomendado", y)
+  local tips = {
+    "Nuevo crea un perfil desde tu estado actual.",
+    "Guardar y usar guarda el estado actual y marca ese perfil como actual.",
+    "Actualizar perfil guarda el estado actual en el perfil seleccionado sin aplicarlo.",
+    "Si cambias addons, ModeShift pedira reload cuando sea necesario.",
+    "El menu del minimapa permite aplicar perfiles por spec y tipo.",
+  }
+
+  for _, tip in ipairs(tips) do
+    local row = makeText(parent, "- " .. tip)
+    row:SetPoint("TOPLEFT", 4, y)
+    row:SetWidth(650)
+    y = y - 22
+  end
+
+  return y - 10
 end
 
 function ConfigUI:SerializeProfile(profile)
