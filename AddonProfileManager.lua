@@ -44,6 +44,18 @@ function AddonProfileManager:ClearCache(addonName)
   end
 end
 
+function AddonProfileManager:ClearCurrentCache(addonName)
+  if addonName then
+    self.currentCache[cacheKey(addonName, false)] = nil
+    self.currentCache[cacheKey(addonName, true)] = nil
+    self.currentOptionCache[cacheKey(addonName, false)] = nil
+    self.currentOptionCache[cacheKey(addonName, true)] = nil
+  else
+    self.currentCache = {}
+    self.currentOptionCache = {}
+  end
+end
+
 function AddonProfileManager:GetAvailableProfiles(addonName, deepScan)
   local key = cacheKey(addonName, deepScan)
   if self.profileCache[key] then

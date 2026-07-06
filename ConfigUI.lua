@@ -90,7 +90,7 @@ local function styleButton(button, selected)
     button.modeShiftSelectedBg = button:CreateTexture(nil, "BACKGROUND")
     button.modeShiftSelectedBg:SetPoint("TOPLEFT", 2, -2)
     button.modeShiftSelectedBg:SetPoint("BOTTOMRIGHT", -2, 2)
-    button.modeShiftSelectedBg:SetColorTexture(0.55, 0.02, 0.02, 0.85)
+    button.modeShiftSelectedBg:SetColorTexture(0.18, 0.18, 0.18, 0.92)
   end
   button.modeShiftSelectedBg:SetShown(selected and true or false)
 
@@ -102,7 +102,7 @@ local function styleButton(button, selected)
   local normal = button.GetNormalTexture and button:GetNormalTexture()
   if normal and normal.SetVertexColor then
     if selected then
-      normal:SetVertexColor(0.72, 0.08, 0.05, 1)
+      normal:SetVertexColor(0.55, 0.55, 0.55, 1)
     else
       normal:SetVertexColor(1, 1, 1, 1)
     end
@@ -120,13 +120,13 @@ local function addHover(button, selected)
       fontString:SetTextColor(1, 1, 1)
     end
     if self.modeShiftSelectedBg then
-      self.modeShiftSelectedBg:SetColorTexture(selected and 0.78 or 0.4, selected and 0.05 or 0.03, selected and 0.03 or 0.02, selected and 0.95 or 0.55)
+      self.modeShiftSelectedBg:SetColorTexture(selected and 0.28 or 0.4, selected and 0.28 or 0.03, selected and 0.28 or 0.02, selected and 0.95 or 0.55)
       self.modeShiftSelectedBg:Show()
     end
     local normal = self.GetNormalTexture and self:GetNormalTexture()
     if normal and normal.SetVertexColor then
       if selected then
-        normal:SetVertexColor(0.95, 0.16, 0.1, 1)
+        normal:SetVertexColor(0.7, 0.7, 0.7, 1)
       else
         normal:SetVertexColor(1.25, 1.25, 1.25, 1)
       end
@@ -134,7 +134,7 @@ local function addHover(button, selected)
   end)
   button:SetScript("OnLeave", function(self)
     if self.modeShiftSelectedBg then
-      self.modeShiftSelectedBg:SetColorTexture(0.55, 0.02, 0.02, 0.85)
+      self.modeShiftSelectedBg:SetColorTexture(0.18, 0.18, 0.18, 0.92)
       self.modeShiftSelectedBg:SetShown(selected and true or false)
     end
     styleButton(self, selected)
@@ -203,6 +203,18 @@ function ConfigUI:Initialize()
   end
 
   local frame = CreateFrame("Frame", "ModeShiftConfigFrame", UIParent, "BasicFrameTemplateWithInset")
+  if UISpecialFrames then
+    local alreadyRegistered = false
+    for _, frameName in ipairs(UISpecialFrames) do
+      if frameName == "ModeShiftConfigFrame" then
+        alreadyRegistered = true
+        break
+      end
+    end
+    if not alreadyRegistered then
+      table.insert(UISpecialFrames, "ModeShiftConfigFrame")
+    end
+  end
   frame:SetSize(1040, 650)
   frame:SetPoint("CENTER")
   raiseFrame(frame)
@@ -218,6 +230,7 @@ function ConfigUI:Initialize()
   frame:SetScript("OnDragStart", frame.StartMoving)
   frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
   frame:SetScript("OnMouseDown", function(self)
+    ModeShift.ConfigUI:CloseDropdown()
     raiseFrame(self)
   end)
   frame:SetScript("OnHide", function()
@@ -336,6 +349,10 @@ function ConfigUI:CloseDropdown()
       end
     end
   end
+
+  if self.dropdownBlocker then
+    self.dropdownBlocker:Hide()
+  end
 end
 
 function ConfigUI:OpenDropdown(anchor, title, items, width)
@@ -367,6 +384,23 @@ function ConfigUI:OpenDropdown(anchor, title, items, width)
     self.dropdown.title:SetJustifyH("LEFT")
   end
 
+  if not self.dropdownBlocker then
+    self.dropdownBlocker = CreateFrame("Button", "ModeShiftDropdownBlocker", UIParent)
+    self.dropdownBlocker:SetAllPoints(UIParent)
+    self.dropdownBlocker:SetFrameStrata("TOOLTIP")
+    self.dropdownBlocker:EnableMouse(true)
+    if self.dropdownBlocker.EnableMouseWheel then
+      self.dropdownBlocker:EnableMouseWheel(true)
+    end
+    self.dropdownBlocker:RegisterForClicks("AnyUp")
+    self.dropdownBlocker:SetScript("OnClick", function()
+      self:CloseDropdown()
+    end)
+    self.dropdownBlocker:SetScript("OnMouseWheel", function()
+      self:CloseDropdown()
+    end)
+  end
+
   local menuItems = items
   local menuTitle = title or "Seleccion"
   local menuWidth = width or 320
@@ -379,6 +413,8 @@ function ConfigUI:OpenDropdown(anchor, title, items, width)
   local rows = dropdown.rows
   dropdown:SetParent(self.frame or UIParent)
   dropdown:SetFrameLevel(((self.frame and self.frame:GetFrameLevel()) or 100) + 100)
+  self.dropdownBlocker:SetFrameLevel(dropdown:GetFrameLevel() - 10)
+  self.dropdownBlocker:Show()
 
   local function runItem(itemData)
     self:CloseDropdown()
@@ -625,6 +661,10 @@ end
 function ConfigUI:Refresh()
   if not self.frame then
     return
+  end
+
+  if ModeShift.AddonProfileManager and ModeShift.AddonProfileManager.ClearCurrentCache then
+    ModeShift.AddonProfileManager:ClearCurrentCache()
   end
 
   self:EnsureSelection()
@@ -1058,7 +1098,7 @@ function ConfigUI:BuildAddonsTab(parent, profile, y)
   local profileHeader = makeText(parent, "Perfil interno", "GameFontNormalSmall")
   profileHeader:SetPoint("TOPLEFT", 320, y)
   profileHeader:SetWidth(210)
-  local configHeader = makeText(parent, "Config", "GameFontNormalSmall")
+  local configHeader = makeText(parent, "Disenos", "GameFontNormalSmall")
   configHeader:SetPoint("TOPLEFT", 560, y)
   configHeader:SetWidth(100)
   y = y - 22
@@ -1107,14 +1147,14 @@ function ConfigUI:BuildAddonProfilePicker(parent, profile, addonName, y)
   end
 
   local currentProfile = nil
-  if not hasSavedProfile and ModeShift.AddonProfileManager then
+  if ModeShift.AddonProfileManager then
     currentProfile = ModeShift.AddonProfileManager:GetCurrentProfile(addonName, true)
   end
   local text = "Elegir perfil"
-  if hasSavedProfile then
-    text = "Perfil: " .. entry.profileName
-  elseif currentProfile then
-    text = "Actual: " .. currentProfile
+  if currentProfile then
+    text = currentProfile
+  elseif hasSavedProfile then
+    text = entry.profileName
   end
 
   local currentButton = makeButton(parent, text, 220, 22, function(button)
@@ -1163,7 +1203,7 @@ function ConfigUI:OpenAddonProfileDropdown(anchor, profile, addonName)
 
   local entry = profile.addonProfiles and profile.addonProfiles.entries and profile.addonProfiles.entries[addonName] or nil
   local selected = entry and entry.profileName or nil
-  local effectiveSelected = selected or currentProfile
+  local effectiveSelected = currentProfile or selected
   local items = {}
   local seen = {}
 
@@ -1216,13 +1256,11 @@ function ConfigUI:BuildAddonOptionPicker(parent, profile, addonName, y)
   profile.addonProfiles.entries = profile.addonProfiles.entries or {}
   local entry = profile.addonProfiles.entries[addonName] or { enabled = false, profileName = nil, optionName = nil }
   local currentOption = nil
-  if not entry.optionName and ModeShift.AddonProfileManager then
+  if ModeShift.AddonProfileManager then
     currentOption = ModeShift.AddonProfileManager:GetCurrentOption(addonName, true)
   end
-  local defaultText = isCooldownManagerAddon(addonName) and "Perfiles CMC" or "Config..."
-  local selectedPrefix = isCooldownManagerAddon(addonName) and "Perfil CMC: " or "Config: "
-  local currentPrefix = isCooldownManagerAddon(addonName) and "Actual CMC: " or "Actual: "
-  local selected = entry.optionName and (selectedPrefix .. entry.optionName) or (currentOption and (currentPrefix .. currentOption) or defaultText)
+  local defaultText = isCooldownManagerAddon(addonName) and "Disenos CDM" or "Config..."
+  local selected = currentOption or entry.optionName or defaultText
 
   local button = makeButton(parent, selected, 150, 22, function(anchor)
     self:OpenAddonOptionDropdown(anchor, profile, addonName)
@@ -1257,13 +1295,13 @@ function ConfigUI:OpenAddonOptionDropdown(anchor, profile, addonName)
 
   local entry = profile.addonProfiles and profile.addonProfiles.entries and profile.addonProfiles.entries[addonName] or nil
   local selected = entry and entry.optionName or nil
-  local effectiveSelected = selected or currentOption
+  local effectiveSelected = currentOption or selected
   local items = {}
   local seen = {}
 
   if currentOption then
     table.insert(items, {
-      text = (isCooldownManagerAddon(addonName) and "Actual CMC: " or "Actual: ") .. currentOption,
+      text = (isCooldownManagerAddon(addonName) and "Diseno actual: " or "Actual: ") .. currentOption,
       selected = effectiveSelected == currentOption,
       onClick = function()
         self:SetAddonOption(profile, addonName, currentOption)
@@ -1287,7 +1325,8 @@ function ConfigUI:OpenAddonOptionDropdown(anchor, profile, addonName)
   end
 
   if #items == 0 then
-    table.insert(items, { text = "No he encontrado configs", disabled = true })
+    local emptyText = isCooldownManagerAddon(addonName) and "No he encontrado disenos" or "No he encontrado configs"
+    table.insert(items, { text = emptyText, disabled = true })
   end
 
   table.insert(items, { divider = true })
@@ -1298,7 +1337,7 @@ function ConfigUI:OpenAddonOptionDropdown(anchor, profile, addonName)
     end,
   })
 
-  local title = isCooldownManagerAddon(addonName) and (addonName .. " perfiles") or (addonName .. " config")
+  local title = isCooldownManagerAddon(addonName) and (addonName .. " disenos") or (addonName .. " config")
   self:OpenDropdown(anchor, title, items, 320)
 end
 

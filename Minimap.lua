@@ -32,23 +32,25 @@ local function updateDragPosition(button)
   px = px / scale
   py = py / scale
 
-  if button.modeShiftDragStartX and button.modeShiftDragStartY then
-    local dx = px - button.modeShiftDragStartX
-    local dy = py - button.modeShiftDragStartY
-    if (dx * dx) + (dy * dy) > 16 then
-      button.modeShiftDragged = true
-    end
+  if not (button.modeShiftMouseDown and button.modeShiftDragStartX and button.modeShiftDragStartY) then
+    return
   end
 
+  local dx = px - button.modeShiftDragStartX
+  local dy = py - button.modeShiftDragStartY
+  if not button.modeShiftDragged and (dx * dx) + (dy * dy) <= 16 then
+    return
+  end
+
+  button.modeShiftDragged = true
   local atan = math.atan2 or math.atan
   local angle = math.deg(atan(py - my, px - mx))
   saveAngle(angle)
   updatePosition(button)
 end
 
-local function minimapButton_OnClick(self, button)
+local function minimapButton_Open(self, button)
   if self.modeShiftDragged then
-    self.modeShiftDragged = nil
     return
   end
 
@@ -74,23 +76,34 @@ function MinimapModule:Initialize()
   button:SetFrameLevel((Minimap:GetFrameLevel() or 0) + 8)
   updatePosition(button)
   button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-  button:RegisterForDrag("LeftButton")
-  button:SetScript("OnClick", minimapButton_OnClick)
-  button:SetScript("OnDragStart", function(self)
+  button:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
+  button:SetPushedTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
+  button:SetScript("OnMouseDown", function(self, mouseButton)
+    if mouseButton ~= "LeftButton" then
+      return
+    end
+
     local px, py = GetCursorPosition()
     local scale = UIParent:GetEffectiveScale()
     self.modeShiftDragStartX = px / scale
     self.modeShiftDragStartY = py / scale
-    self.modeShiftDragging = true
+    self.modeShiftMouseDown = true
     self.modeShiftDragged = false
     self:SetScript("OnUpdate", updateDragPosition)
   end)
-  button:SetScript("OnDragStop", function(self)
-    self.modeShiftDragging = nil
+  button:SetScript("OnMouseUp", function(self, mouseButton)
+    local wasDragged = self.modeShiftDragged
+    self.modeShiftMouseDown = nil
     self.modeShiftDragStartX = nil
     self.modeShiftDragStartY = nil
+    self.modeShiftDragged = nil
     self:SetScript("OnUpdate", nil)
-    updatePosition(self)
+    if wasDragged then
+      updatePosition(self)
+      return
+    end
+
+    minimapButton_Open(self, mouseButton)
   end)
   button:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
@@ -106,8 +119,16 @@ function MinimapModule:Initialize()
 
   button.icon = button:CreateTexture(nil, "ARTWORK")
   button.icon:SetTexture(ModeShift.Constants.DEFAULT_ICON)
-  button.icon:SetSize(20, 20)
+  button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+  button.icon:SetSize(18, 18)
   button.icon:SetPoint("CENTER", 0, 0)
+  if button.CreateMaskTexture and button.icon.AddMaskTexture then
+    button.iconMask = button:CreateMaskTexture()
+    button.iconMask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+    button.iconMask:SetSize(20, 20)
+    button.iconMask:SetPoint("CENTER", button, "CENTER", 0, 0)
+    button.icon:AddMaskTexture(button.iconMask)
+  end
 
   button.border = button:CreateTexture(nil, "OVERLAY")
   button.border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")

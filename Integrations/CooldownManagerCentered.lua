@@ -6,7 +6,6 @@ local optionMethods = {
   "GetLayouts",
   "GetLayoutList",
   "GetLoadouts",
-  "GetProfiles",
   "GetPresets",
   "GetConfigurations",
   "GetConfigs",
@@ -205,6 +204,302 @@ local function profileApi()
   return _G.CooldownManagerCentered and _G.CooldownManagerCentered.ns and _G.CooldownManagerCentered.ns.ProfileAPI
 end
 
+local function refreshCooldownManager()
+  local addon = _G.CooldownManagerCentered
+  local ns = addon and addon.ns
+  if ns and ns.API and type(ns.API.RefreshCooldownManager) == "function" then
+    ModeShift:SafeCall("CMC RefreshCooldownManager", ns.API.RefreshCooldownManager, ns.API)
+  end
+  if ns and ns.CooldownManager and type(ns.CooldownManager.ForceRefreshAll) == "function" then
+    ModeShift:SafeCall("CMC ForceRefreshAll", ns.CooldownManager.ForceRefreshAll)
+  end
+end
+
+local function ensureCooldownViewerSettings()
+  if _G.CooldownViewerSettings then
+    return true
+  end
+
+  if C_AddOns and type(C_AddOns.LoadAddOn) == "function" then
+    ModeShift:SafeCall("Load Blizzard_CooldownViewer", C_AddOns.LoadAddOn, "Blizzard_CooldownViewer")
+  elseif LoadAddOn then
+    ModeShift:SafeCall("Load Blizzard_CooldownViewer", LoadAddOn, "Blizzard_CooldownViewer")
+  end
+
+  return _G.CooldownViewerSettings ~= nil
+end
+
+local function cooldownLayoutManager()
+  if not ensureCooldownViewerSettings() then
+    return nil
+  end
+
+  if _G.CooldownViewerSettings and type(_G.CooldownViewerSettings.GetLayoutManager) == "function" then
+    local ok, manager = ModeShift:SafeCall("CDM GetLayoutManager", _G.CooldownViewerSettings.GetLayoutManager, _G.CooldownViewerSettings)
+    if ok and manager then
+      return manager
+    end
+  end
+
+  return nil
+end
+
+local function isBlizzardEditModeLayoutName(name)
+  local lower = tostring(name or ""):lower()
+  local asciiOnly = lower:gsub("[^%a]", "")
+  return lower == "modern"
+    or lower == "classic"
+    or lower == "moderno"
+    or lower == "clasico"
+    or asciiOnly == "clsico"
+end
+
+local function cooldownLayoutName(layout)
+  if not layout then
+    return nil
+  end
+
+  if type(CooldownManagerLayout_GetName) == "function" then
+    local ok, name = ModeShift:SafeCall("CDM Layout GetName", CooldownManagerLayout_GetName, layout)
+    if ok and name and name ~= "" then
+      return tostring(name)
+    end
+  end
+
+  if type(layout) == "table" then
+    if layout.layoutName then
+      return tostring(layout.layoutName)
+    end
+    if layout.name then
+      return tostring(layout.name)
+    end
+    if type(layout.GetName) == "function" then
+      local ok, name = ModeShift:SafeCall("CDM layout:GetName", layout.GetName, layout)
+      if ok and name and name ~= "" then
+        return tostring(name)
+      end
+    end
+  end
+
+  return nil
+end
+
+local function cooldownLayoutID(layout)
+  if not layout then
+    return nil
+  end
+
+  if type(CooldownManagerLayout_GetID) == "function" then
+    local ok, id = ModeShift:SafeCall("CDM Layout GetID", CooldownManagerLayout_GetID, layout)
+    if ok and id then
+      return id
+    end
+  end
+
+  if type(layout) == "table" then
+    return layout.id or layout.layoutID or layout.layoutId or layout.ID
+  end
+
+  return nil
+end
+
+local function addCooldownLayout(out, seen, layout)
+  local name = cooldownLayoutName(layout)
+  if not name or name == "" or isBlizzardEditModeLayoutName(name) or seen[name] then
+    return
+  end
+
+  seen[name] = {
+    name = name,
+    id = cooldownLayoutID(layout),
+    layout = layout,
+  }
+  table.insert(out, name)
+end
+
+local function collectCooldownLayoutsFromValue(out, seen, value, depth)
+  if depth > 4 or type(value) ~= "table" then
+    return
+  end
+
+  addCooldownLayout(out, seen, value)
+  for _, child in pairs(value) do
+    if type(child) == "table" then
+      collectCooldownLayoutsFromValue(out, seen, child, depth + 1)
+    end
+  end
+end
+
+local function getCooldownLayoutMap()
+  local manager = cooldownLayoutManager()
+  local out = {}
+  local seen = {}
+  if not manager then
+    return out, seen
+  end
+
+  local modes = { false }
+  if Enum and Enum.CDMLayoutMode and Enum.CDMLayoutMode.AccessOnly then
+    table.insert(modes, Enum.CDMLayoutMode.AccessOnly)
+  end
+
+  local methods = {
+    "GetLayouts",
+    "GetAllLayouts",
+    "GetLayoutsForCurrentSpec",
+    "GetCustomLayouts",
+  }
+
+  for _, methodName in ipairs(methods) do
+    if type(manager[methodName]) == "function" then
+      for _, mode in ipairs(modes) do
+        local ok, value
+        if mode == false then
+          ok, value = ModeShift:SafeCall("CDM " .. methodName, manager[methodName], manager)
+        else
+          ok, value = ModeShift:SafeCall("CDM " .. methodName, manager[methodName], manager, mode)
+        end
+        if ok then
+          collectCooldownLayoutsFromValue(out, seen, value, 1)
+        end
+      end
+    end
+  end
+
+  if type(manager.GetLayout) == "function" then
+    for id = 1, 120 do
+      local ok, layout = ModeShift:SafeCall("CDM GetLayout", manager.GetLayout, manager, id)
+      if ok and layout then
+        addCooldownLayout(out, seen, layout)
+      end
+    end
+  end
+
+  table.sort(out)
+  return out, seen
+end
+
+local function getCooldownLayouts()
+  local layouts = getCooldownLayoutMap()
+  return layouts
+end
+
+local function getCurrentCooldownLayout()
+  local manager = cooldownLayoutManager()
+  if not manager then
+    return nil
+  end
+
+  local modes = { false }
+  if Enum and Enum.CDMLayoutMode and Enum.CDMLayoutMode.AccessOnly then
+    table.insert(modes, Enum.CDMLayoutMode.AccessOnly)
+  end
+
+  if type(manager.GetActiveLayout) == "function" then
+    for _, mode in ipairs(modes) do
+      local ok, layout
+      if mode == false then
+        ok, layout = ModeShift:SafeCall("CDM GetActiveLayout", manager.GetActiveLayout, manager)
+      else
+        ok, layout = ModeShift:SafeCall("CDM GetActiveLayout", manager.GetActiveLayout, manager, mode)
+      end
+      if ok and layout then
+        local name = cooldownLayoutName(layout)
+        if name and not isBlizzardEditModeLayoutName(name) then
+          return name
+        end
+      end
+    end
+  end
+
+  if type(manager.GetActiveLayoutID) == "function" and type(manager.GetLayout) == "function" then
+    local ok, id = ModeShift:SafeCall("CDM GetActiveLayoutID", manager.GetActiveLayoutID, manager)
+    if ok and id then
+      local layoutOk, layout = ModeShift:SafeCall("CDM GetLayout active", manager.GetLayout, manager, id)
+      if layoutOk and layout then
+        local name = cooldownLayoutName(layout)
+        if name and not isBlizzardEditModeLayoutName(name) then
+          return name
+        end
+      end
+    end
+  end
+
+  return nil
+end
+
+local function findCooldownLayoutByName(manager, optionName)
+  if not manager then
+    return nil
+  end
+
+  local specTag = nil
+  if type(manager.GetCurrentSpecTag) == "function" then
+    local ok, tag = ModeShift:SafeCall("CDM GetCurrentSpecTag", manager.GetCurrentSpecTag, manager)
+    if ok then
+      specTag = tag
+    end
+  end
+
+  if type(manager.GetLayoutByName) == "function" then
+    local ok, layout = ModeShift:SafeCall("CDM GetLayoutByName spec", manager.GetLayoutByName, manager, optionName, specTag)
+    if ok and layout then
+      return layout
+    end
+    ok, layout = ModeShift:SafeCall("CDM GetLayoutByName all", manager.GetLayoutByName, manager, optionName)
+    if ok and layout then
+      return layout
+    end
+  end
+
+  local _, map = getCooldownLayoutMap()
+  local target = tostring(optionName or ""):lower()
+  for name, entry in pairs(map) do
+    if tostring(name):lower() == target then
+      return entry.layout, entry.id
+    end
+  end
+
+  return nil
+end
+
+local function applyCooldownLayout(optionName)
+  if InCombatLockdown and InCombatLockdown() then
+    return false, "no se puede cambiar diseno de CDM en combate"
+  end
+
+  local manager = cooldownLayoutManager()
+  if not manager then
+    return false, "no encuentro CooldownViewerSettings"
+  end
+
+  local layout, layoutID = findCooldownLayoutByName(manager, optionName)
+  if not layout then
+    return false, "no encuentro el diseno " .. tostring(optionName)
+  end
+  layoutID = layoutID or cooldownLayoutID(layout)
+
+  if type(manager.SetActiveLayout) == "function" then
+    local applied, err = ModeShift:SafeCall("CDM SetActiveLayout", manager.SetActiveLayout, manager, layout)
+    if not applied then
+      return false, err
+    end
+  elseif layoutID and type(manager.SetActiveLayoutByID) == "function" then
+    local applied, err = ModeShift:SafeCall("CDM SetActiveLayoutByID", manager.SetActiveLayoutByID, manager, layoutID)
+    if not applied then
+      return false, err
+    end
+  else
+    return false, "CDM no permite activar este diseno"
+  end
+
+  if type(manager.SaveLayouts) == "function" then
+    ModeShift:SafeCall("CDM SaveLayouts", manager.SaveLayouts, manager)
+  end
+  refreshCooldownManager()
+  return true
+end
+
 local function callNamespaceMethod(namespace, methodName, ...)
   local ok, value = ModeShift:SafeCall("Cooldown " .. methodName, namespace[methodName], namespace, ...)
   if ok then
@@ -268,7 +563,7 @@ local function getCurrentDesignFromRuntime()
     end
   end
 
-  return ModeShift.Integrations:GetGenericCurrentOption("CooldownManagerCentered", true)
+  return nil
 end
 
 local function applyDesignRuntime(optionName)
@@ -289,7 +584,7 @@ local function applyDesignRuntime(optionName)
     return true
   end
 
-  return ModeShift.Integrations:ApplyGenericOption("CooldownManagerCentered", optionName)
+  return false, "no encuentro el diseno " .. tostring(optionName)
 end
 
 ModeShift.Integrations:Register({
@@ -331,43 +626,12 @@ ModeShift.Integrations:Register({
     return ModeShift.Integrations:ApplyGenericProfile("CooldownManagerCentered", profileName)
   end,
   getOptions = function()
-    local api = profileApi()
-    if api and type(api.GetProfiles) == "function" then
-      local ok, profiles = ModeShift:SafeCall("CMC GetProfiles", api.GetProfiles, api)
-      if ok and type(profiles) == "table" then
-        table.sort(profiles)
-        return profiles
-      end
-    end
-    local options = getDesignsFromRuntime()
-    if #options > 0 then
-      return options
-    end
-    return ModeShift.Integrations:GetGenericOptions("CooldownManagerCentered", true)
+    return getCooldownLayouts()
   end,
   getCurrentOption = function()
-    local api = profileApi()
-    if api and type(api.GetCurrentProfile) == "function" then
-      local ok, profileName = ModeShift:SafeCall("CMC GetCurrentProfile", api.GetCurrentProfile, api)
-      if ok and profileName then
-        return tostring(profileName)
-      end
-    end
-    return getCurrentDesignFromRuntime()
+    return getCurrentCooldownLayout()
   end,
   applyOption = function(optionName)
-    local api = profileApi()
-    if api and type(api.SetProfile) == "function" then
-      local ok, err = ModeShift:SafeCall("CMC SetProfile", api.SetProfile, api, optionName)
-      if ok then
-        return true
-      end
-      return false, err
-    end
-    local applied, applyErr = applyDesignRuntime(optionName)
-    if applied then
-      return true
-    end
-    return false, applyErr or err
+    return applyCooldownLayout(optionName)
   end,
 })
