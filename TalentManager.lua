@@ -42,6 +42,13 @@ function TalentManager:GetSelectedLoadoutId(specId)
   return nil
 end
 
+function TalentManager:SetSelectedLoadoutId(specId, configId)
+  specId = specId or ModeShift:GetCurrentSpecId()
+  if specId and configId and C_ClassTalents and C_ClassTalents.UpdateLastSelectedSavedConfigID then
+    ModeShift:SafeCall("UpdateLastSelectedSavedConfigID", C_ClassTalents.UpdateLastSelectedSavedConfigID, specId, configId)
+  end
+end
+
 function TalentManager:GetTalentLoadouts(specId)
   local loadouts = {}
   specId = specId or ModeShift:GetCurrentSpecId()
@@ -63,6 +70,26 @@ function TalentManager:GetTalentLoadouts(specId)
   end
 
   return loadouts
+end
+
+function TalentManager:GetLoadoutById(configId, specId)
+  if not configId then
+    return nil
+  end
+
+  local loadouts = self:GetTalentLoadouts(specId)
+  for _, loadout in ipairs(loadouts) do
+    if loadout.id == configId then
+      return loadout
+    end
+  end
+
+  local name = self:GetConfigName(configId)
+  if name then
+    return { id = configId, name = name, specId = specId or ModeShift:GetCurrentSpecId(), active = true }
+  end
+
+  return nil
 end
 
 function TalentManager:GetCurrentLoadout(specId)
@@ -187,41 +214,120 @@ function TalentManager:RefreshBlizzardTalentUI(preferredLoadoutId)
   end
 end
 
-function TalentManager:CommitActiveConfig()
+function TalentManager:CommitActiveConfig(loadoutId)
   if ModeShift:IsInCombat() then
     return false
   end
 
-  if not (C_Traits and C_Traits.CommitConfig) then
-    return false
+  if C_Traits and C_Traits.IsReadyForCommit then
+    local readyOk, ready = ModeShift:SafeCall("IsReadyForCommit", C_Traits.IsReadyForCommit)
+    if readyOk and ready == false then
+      return false
+    end
   end
 
+  local committed = false
   local activeConfigId = self:GetActiveTraitConfigId()
-  if not activeConfigId then
-    return false
+  if activeConfigId and C_Traits and C_Traits.CommitConfig then
+    local ok, didCommit = ModeShift:SafeCall("CommitConfig", C_Traits.CommitConfig, activeConfigId)
+    committed = committed or (ok and didCommit ~= false)
   end
 
-  local ok = ModeShift:SafeCall("CommitConfig", C_Traits.CommitConfig, activeConfigId)
-  return ok and true or false
+  if loadoutId then
+    self:SetSelectedLoadoutId(ModeShift:GetCurrentSpecId(), loadoutId)
+  end
+
+  return committed
 end
 
-function TalentManager:ScheduleCommit(loadoutId)
+function TalentManager:IsCommitPending()
+  return self.pendingConfigId and true or false
+end
+
+function TalentManager:HasPendingTalentChanges()
+  local activeConfigId = self:GetActiveTraitConfigId()
+  if activeConfigId and C_Traits and C_Traits.ConfigHasStagedChanges then
+    local ok, hasChanges = ModeShift:SafeCall("ConfigHasStagedChanges", C_Traits.ConfigHasStagedChanges, activeConfigId)
+    if ok and hasChanges then
+      return true
+    end
+  end
+
+  for _, talentFrame in ipairs(self:GetTalentFrames()) do
+    local applyButton = talentFrame and talentFrame.ApplyButton
+    if applyButton and applyButton.IsShown and applyButton:IsShown() then
+      return true
+    end
+  end
+
+  return false
+end
+
+function TalentManager:ConfirmPendingLoadout()
+  if not self.pendingConfigId then
+    return true
+  end
+
+  local selectedLoadoutId = self:GetSelectedLoadoutId(ModeShift:GetCurrentSpecId())
+  if selectedLoadoutId == self.pendingConfigId and not self:HasPendingTalentChanges() then
+    self.pendingConfigId = nil
+    self.pendingConfigName = nil
+    self.commitScheduled = nil
+    self.commitAttemptsLeft = nil
+    return true
+  end
+
+  return false
+end
+
+function TalentManager:ScheduleCommit(loadoutId, attemptsLeft)
+  if self.commitScheduled and self.pendingConfigId == loadoutId then
+    return
+  end
+
+  self.commitScheduled = true
+  self.commitAttemptsLeft = attemptsLeft or 6
+  self:RefreshBlizzardTalentUI(loadoutId)
+
+  local function finishStep()
+    if not self.pendingConfigId then
+      self.commitScheduled = nil
+      self.commitAttemptsLeft = nil
+      return
+    end
+
+    self:SetSelectedLoadoutId(ModeShift:GetCurrentSpecId(), loadoutId)
+
+    if self:ConfirmPendingLoadout() then
+      self:RefreshBlizzardTalentUI(loadoutId)
+      return
+    end
+
+    if self:HasPendingTalentChanges() then
+      self:CommitActiveConfig(loadoutId)
+    end
+
+    if self:ConfirmPendingLoadout() then
+      self:RefreshBlizzardTalentUI(loadoutId)
+      return
+    end
+
+    self.commitAttemptsLeft = (self.commitAttemptsLeft or 0) - 1
+    if self.commitAttemptsLeft <= 0 then
+      self.commitScheduled = nil
+      ModeShift:Print("|cffffff66!|r talentos cargados, pero Blizzard aun muestra cambios pendientes. Pulsa Aplicar cambios si la ventana de talentos sigue abierta.")
+      return
+    end
+
+    if C_Timer and C_Timer.After then
+      C_Timer.After(0.45, finishStep)
+    end
+  end
+
   if C_Timer and C_Timer.After then
-    C_Timer.After(0.1, function()
-      self:CommitActiveConfig()
-      self:RefreshBlizzardTalentUI(loadoutId)
-    end)
-    C_Timer.After(0.5, function()
-      self:CommitActiveConfig()
-      self:RefreshBlizzardTalentUI(loadoutId)
-    end)
-    C_Timer.After(1.2, function()
-      self:CommitActiveConfig()
-      self:RefreshBlizzardTalentUI(loadoutId)
-    end)
+    C_Timer.After(0.35, finishStep)
   else
-    self:CommitActiveConfig()
-    self:RefreshBlizzardTalentUI(loadoutId)
+    finishStep()
   end
 end
 
@@ -268,6 +374,7 @@ function TalentManager:Apply(profile)
   if ok then
     self.pendingConfigId = loadout.id
     self.pendingConfigName = loadout.name
+    self:SetSelectedLoadoutId(currentSpecId, loadout.id)
     result.message = "Talentos: " .. (loadout.name or loadout.id)
     table.insert(result.applied, result.message)
     if talents.autoApply ~= false then
@@ -302,10 +409,10 @@ function TalentManager:OnEvent(event, addonName)
   then
     local pendingConfigId = self.pendingConfigId
     if self.pendingConfigId then
-      local current = self:GetCurrentLoadout(ModeShift:GetCurrentSpecId())
-      if current and (current.id == self.pendingConfigId or lower(current.name) == lower(self.pendingConfigName)) then
-        self.pendingConfigId = nil
-        self.pendingConfigName = nil
+      if self:ConfirmPendingLoadout() then
+        pendingConfigId = nil
+      elseif not self.commitScheduled then
+        self:ScheduleCommit(self.pendingConfigId)
       end
     end
 

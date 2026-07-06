@@ -118,8 +118,34 @@ function ApplyEngine:CompleteDeferredReload()
     return
   end
 
+  if ModeShift.TalentManager and ModeShift.TalentManager:IsCommitPending() then
+    self.deferredReloadWaits = (self.deferredReloadWaits or 0) + 1
+    if self.deferredReloadWaits > 12 then
+      self.deferredReloadPending = nil
+      self.waitingForTalentReload = nil
+      self.deferredReloadWaits = nil
+      ModeShift:Print("|cffffff66!|r Blizzard sigue mostrando talentos pendientes. No recargo para no perder el cambio; pulsa Aplicar cambios en talentos y luego Reload UI si hace falta.")
+      if ModeShift.RefreshConfig then
+        ModeShift:RefreshConfig()
+      end
+      return
+    end
+
+    if C_Timer and C_Timer.After then
+      C_Timer.After(0.8, function()
+        self:CompleteDeferredReload()
+      end)
+    else
+      self.deferredReloadPending = nil
+      self.waitingForTalentReload = nil
+      self.deferredReloadWaits = nil
+    end
+    return
+  end
+
   self.deferredReloadPending = nil
   self.waitingForTalentReload = nil
+  self.deferredReloadWaits = nil
   ModeShift:Print("talentos aplicados: recargando interfaz automaticamente...")
   self:StartReloadPrompt()
 end
@@ -134,6 +160,7 @@ function ApplyEngine:ScheduleReload(options)
   if options.waitForTalents then
     self.waitingForTalentReload = true
     self.deferredReloadPending = true
+    self.deferredReloadWaits = 0
 
     if ModeShift.RefreshConfig then
       ModeShift:RefreshConfig()
