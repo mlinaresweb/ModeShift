@@ -130,11 +130,23 @@ function AddonManager:IsLoaded(addonName)
 end
 
 function AddonManager:GetAddonIcon(addonName)
-  local icon = getAddOnMetadata(addonName, "IconTexture") or getAddOnMetadata(addonName, "IconAtlas") or getAddOnMetadata(addonName, "Icon")
-  if icon and icon ~= "" then
-    return icon
+  local candidates = {}
+  for _, key in ipairs({ "IconTexture", "Icon", "X-Icon", "X-IconTexture" }) do
+    local icon = getAddOnMetadata(addonName, key)
+    if icon and icon ~= "" then
+      addUnique(candidates, icon)
+    end
   end
-  return "Interface\\Icons\\INV_Misc_QuestionMark"
+
+  for _, key in ipairs({ "IconAtlas", "X-IconAtlas" }) do
+    local atlas = getAddOnMetadata(addonName, key)
+    if atlas and atlas ~= "" then
+      table.insert(candidates, { atlas = atlas })
+    end
+  end
+
+  addUnique(candidates, "Interface\\Icons\\INV_Misc_QuestionMark")
+  return candidates
 end
 
 function AddonManager:IsLoadOnDemand(addonName)

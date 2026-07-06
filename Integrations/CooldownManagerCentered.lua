@@ -204,7 +204,363 @@ local function profileApi()
   return _G.CooldownManagerCentered and _G.CooldownManagerCentered.ns and _G.CooldownManagerCentered.ns.ProfileAPI
 end
 
-local function refreshCooldownManager()
+local function cdmNamespace()
+  return _G.CooldownManagerCentered and _G.CooldownManagerCentered.ns
+end
+
+local function cdmProfile()
+  local ns = cdmNamespace()
+  return ns and ns.db and ns.db.profile
+end
+
+local refreshCooldownManager
+
+local function deepCopy(value)
+  return ModeShift.Utils and ModeShift.Utils:DeepCopy(value) or value
+end
+
+local function startsWith(value, prefix)
+  return type(value) == "string" and value:sub(1, #prefix) == prefix
+end
+
+local rootStateKeys = {
+  _tracker_filled_with_defaults = true,
+  cooldownStyleSettings = true,
+  tracker = true,
+  tracker_count = true,
+  tracker_enabled = true,
+}
+
+local rootStatePrefixes = {
+  "cooldownManager_",
+  "trinketRacialTracker_",
+}
+
+local function isCdmRootStateKey(key)
+  if rootStateKeys[key] then
+    return true
+  end
+
+  for _, prefix in ipairs(rootStatePrefixes) do
+    if startsWith(key, prefix) then
+      return true
+    end
+  end
+
+  return false
+end
+
+local trackerConfigKeys = {
+  point = true,
+  x = true,
+  y = true,
+  scale = true,
+  alpha = true,
+  strata = true,
+  iconSize = true,
+  iconPadding = true,
+  orientation = true,
+  showGCD = true,
+  rangeIndicator = true,
+  requireResource = true,
+  showStacks = true,
+  anchoredToTracker1 = true,
+  anchoredToTracker1Spacing = true,
+  lockHorizontal = true,
+}
+
+local function copyTrackerConfig(source)
+  local copy = {}
+  if type(source) ~= "table" then
+    return copy
+  end
+
+  for key in pairs(trackerConfigKeys) do
+    local value = source[key]
+    if type(value) ~= "table" and value ~= nil then
+      copy[key] = value
+    end
+  end
+
+  return copy
+end
+
+local trackerAnchorByOrientation = {
+  ["Horizontal Right"] = "LEFT",
+  ["Horizontal Center"] = "CENTER",
+  ["Horizontal Left"] = "RIGHT",
+  ["Vertical Down"] = "TOP",
+  ["Vertical Up"] = "BOTTOM",
+}
+
+local trackerRelativeFactors = {
+  LEFT = { x = 0, y = -0.5 },
+  RIGHT = { x = -1, y = -0.5 },
+  TOP = { x = -0.5, y = -1 },
+  BOTTOM = { x = -0.5, y = 0 },
+  CENTER = { x = -0.5, y = -0.5 },
+}
+
+local function syncTrackerConfigFromFrame(db, index)
+  if type(db) ~= "table" then
+    return
+  end
+
+  local editMode = db.editMode
+  if type(editMode) ~= "table" then
+    return
+  end
+
+  local key = "tracker" .. index
+  local config = editMode[key]
+  local frame = _G["CMCTracker" .. index]
+  if type(config) ~= "table" or not frame or not frame.GetCenter or not frame.GetSize then
+    return
+  end
+
+  if frame.GetScale then
+    local scale = frame:GetScale()
+    if scale then
+      config.scale = scale
+    end
+  end
+  if frame.GetAlpha then
+    local alpha = frame:GetAlpha()
+    if alpha then
+      config.alpha = alpha
+    end
+  end
+  if frame.GetFrameStrata then
+    local strata = frame:GetFrameStrata()
+    if strata then
+      config.strata = strata
+    end
+  end
+
+  if config.anchoredToTracker1 then
+    return
+  end
+
+  local centerX, centerY = frame:GetCenter()
+  local frameWidth, frameHeight = frame:GetSize()
+  if not centerX or not centerY or not frameWidth or not frameHeight or not UIParent or not UIParent.GetSize then
+    return
+  end
+
+  local screenWidth, screenHeight = UIParent:GetSize()
+  local frameScale = frame.GetEffectiveScale and frame:GetEffectiveScale() or 1
+  local uiParentScale = UIParent.GetEffectiveScale and UIParent:GetEffectiveScale() or 1
+  local effectiveScale = frameScale / uiParentScale
+  if effectiveScale and effectiveScale > 0 then
+    screenWidth = screenWidth / effectiveScale
+    screenHeight = screenHeight / effectiveScale
+  end
+
+  local anchorPrimary = trackerAnchorByOrientation[config.orientation or "Horizontal Right"] or "LEFT"
+  local factor = trackerRelativeFactors[anchorPrimary] or trackerRelativeFactors.CENTER
+  local x, y
+
+  if anchorPrimary == "LEFT" then
+    x = centerX - frameWidth / 2
+    y = centerY + (screenHeight * factor.y)
+  elseif anchorPrimary == "RIGHT" then
+    x = centerX + frameWidth / 2 - screenWidth
+    y = centerY + (screenHeight * factor.y)
+  elseif anchorPrimary == "TOP" then
+    x = centerX + (screenWidth * factor.x)
+    y = centerY + frameHeight / 2 - screenHeight
+  elseif anchorPrimary == "BOTTOM" then
+    x = centerX + (screenWidth * factor.x)
+    y = centerY - frameHeight / 2
+  else
+    x = centerX - screenWidth / 2
+    y = centerY - screenHeight / 2
+  end
+
+  config.point = anchorPrimary
+  config.x = x
+  config.y = y
+end
+
+local function syncTrackersFromVisibleFrames(db)
+  local count = tonumber(db and db.tracker_count) or 10
+  if count < 1 then
+    count = 10
+  elseif count > 10 then
+    count = 10
+  end
+
+  for index = 1, count do
+    syncTrackerConfigFromFrame(db, index)
+  end
+end
+
+local function getTrackerExtraState()
+  local db = cdmProfile()
+  if not db then
+    return nil
+  end
+
+  syncTrackersFromVisibleFrames(db)
+
+  local state = {
+    version = 2,
+    db = {},
+    tracker_enabled = db.tracker_enabled and true or false,
+    tracker_count = db.tracker_count,
+    editMode = {},
+  }
+
+  for key, value in pairs(db) do
+    if isCdmRootStateKey(key) then
+      state.db[key] = deepCopy(value)
+    end
+  end
+
+  local editMode = db.editMode or {}
+  local count = tonumber(db.tracker_count) or 0
+  if count < 1 then
+    count = 10
+  end
+
+  if type(editMode) == "table" then
+    state.editMode = deepCopy(editMode)
+  end
+
+  -- Compatibility with older captured states that only knew about trackers.
+  for index = 1, count do
+    local key = "tracker" .. index
+    if type(editMode[key]) == "table" and type(state.editMode[key]) ~= "table" then
+      state.editMode[key] = copyTrackerConfig(editMode[key])
+    end
+  end
+
+  if next(state.db) == nil and next(state.editMode) == nil and not state.tracker_enabled then
+    return nil
+  end
+
+  return state
+end
+
+local function refreshTrackerState(ns, db)
+  if ns.TrackerDB and type(ns.TrackerDB.InitializeDB) == "function" then
+    ModeShift:SafeCall("CMC TrackerDB InitializeDB", ns.TrackerDB.InitializeDB)
+  end
+  if ns.TrackerItemsData and type(ns.TrackerItemsData.InvalidateOwnedItemsCache) == "function" then
+    ModeShift:SafeCall("CMC Tracker InvalidateOwnedItemsCache", ns.TrackerItemsData.InvalidateOwnedItemsCache, ns.TrackerItemsData)
+  end
+  if ns.TrackerItemViewer then
+    if db.tracker_enabled and type(ns.TrackerItemViewer.Initialize) == "function" then
+      ModeShift:SafeCall("CMC Tracker Initialize", ns.TrackerItemViewer.Initialize, ns.TrackerItemViewer)
+    end
+    if type(ns.TrackerItemViewer.EnsureTrackers) == "function" then
+      ModeShift:SafeCall("CMC Tracker EnsureTrackers", ns.TrackerItemViewer.EnsureTrackers, ns.TrackerItemViewer)
+    end
+    if type(ns.TrackerItemViewer.ReconcileTrackerCount) == "function" then
+      ModeShift:SafeCall("CMC Tracker ReconcileTrackerCount", ns.TrackerItemViewer.ReconcileTrackerCount, ns.TrackerItemViewer)
+    end
+    if type(ns.TrackerItemViewer.RefreshItemViewerFrames) == "function" then
+      ModeShift:SafeCall("CMC Tracker RefreshItemViewerFrames", ns.TrackerItemViewer.RefreshItemViewerFrames, ns.TrackerItemViewer)
+    end
+    if type(ns.TrackerItemViewer.RefreshStyling) == "function" then
+      ModeShift:SafeCall("CMC Tracker RefreshStyling", ns.TrackerItemViewer.RefreshStyling, ns.TrackerItemViewer)
+    end
+    if type(ns.TrackerItemViewer.RefreshUsabilityTints) == "function" then
+      ModeShift:SafeCall("CMC Tracker RefreshUsabilityTints", ns.TrackerItemViewer.RefreshUsabilityTints, ns.TrackerItemViewer)
+    end
+  end
+end
+
+local function refreshViewerState(ns)
+  refreshCooldownManager()
+
+  if ns.StyledIcons and type(ns.StyledIcons.OnSettingChanged) == "function" then
+    ModeShift:SafeCall("CMC StyledIcons OnSettingChanged", ns.StyledIcons.OnSettingChanged, ns.StyledIcons)
+  elseif ns.StyledIcons and type(ns.StyledIcons.RefreshAll) == "function" then
+    ModeShift:SafeCall("CMC StyledIcons RefreshAll", ns.StyledIcons.RefreshAll, ns.StyledIcons)
+  end
+
+  if ns.CooldownFont and type(ns.CooldownFont.RefreshAll) == "function" then
+    ModeShift:SafeCall("CMC CooldownFont RefreshAll", ns.CooldownFont.RefreshAll, ns.CooldownFont)
+  end
+  if ns.Stacks and type(ns.Stacks.RefreshAll) == "function" then
+    ModeShift:SafeCall("CMC Stacks RefreshAll", ns.Stacks.RefreshAll, ns.Stacks)
+  end
+  if ns.RangeCheck and type(ns.RangeCheck.RefreshAll) == "function" then
+    ModeShift:SafeCall("CMC RangeCheck RefreshAll", ns.RangeCheck.RefreshAll, ns.RangeCheck)
+  end
+  if ns.BuffBarIconMode and type(ns.BuffBarIconMode.RefreshAll) == "function" then
+    ModeShift:SafeCall("CMC BuffBarIconMode RefreshAll", ns.BuffBarIconMode.RefreshAll)
+  end
+
+  if ns.Keybinds and type(ns.Keybinds.OnSettingChanged) == "function" then
+    ModeShift:SafeCall("CMC Keybinds OnSettingChanged", ns.Keybinds.OnSettingChanged, ns.Keybinds)
+  end
+  if ns.Assistant and type(ns.Assistant.OnSettingChanged) == "function" then
+    ModeShift:SafeCall("CMC Assistant Essential", ns.Assistant.OnSettingChanged, ns.Assistant, "Essential")
+    ModeShift:SafeCall("CMC Assistant Utility", ns.Assistant.OnSettingChanged, ns.Assistant, "Utility")
+  end
+
+  if C_Timer and type(C_Timer.After) == "function" then
+    C_Timer.After(0.1, refreshCooldownManager)
+  end
+end
+
+local function applyTrackerExtraState(state)
+  if type(state) ~= "table" then
+    return false, "estado de trackers invalido"
+  end
+
+  local ns = cdmNamespace()
+  local db = cdmProfile()
+  if not ns or not db then
+    return false, "CooldownManagerCentered no esta listo"
+  end
+
+  if type(state.db) == "table" then
+    for key, value in pairs(state.db) do
+      if isCdmRootStateKey(key) then
+        db[key] = deepCopy(value)
+      end
+    end
+  end
+
+  -- Older captures only had these values at the top level.
+  if state.tracker_enabled ~= nil then
+    db.tracker_enabled = state.tracker_enabled and true or false
+  end
+  if tonumber(state.tracker_count) then
+    db.tracker_count = tonumber(state.tracker_count)
+  end
+  if type(state.tracker) == "table" then
+    db.tracker = deepCopy(state.tracker)
+  end
+  if type(state.cooldownStyleSettings) == "table" then
+    db.cooldownStyleSettings = deepCopy(state.cooldownStyleSettings)
+  end
+
+  db.editMode = db.editMode or {}
+  if state.version == 2 and type(state.editMode) == "table" then
+    db.editMode = deepCopy(state.editMode)
+  else
+    for key, config in pairs(state.editMode or {}) do
+      if type(key) == "string" and key:match("^tracker%d+$") and type(config) == "table" then
+        db.editMode[key] = db.editMode[key] or {}
+        for configKey in pairs(trackerConfigKeys) do
+          if config[configKey] ~= nil then
+            db.editMode[key][configKey] = config[configKey]
+          end
+        end
+      end
+    end
+  end
+
+  refreshTrackerState(ns, db)
+  refreshViewerState(ns)
+  return true
+end
+
+function refreshCooldownManager()
   local addon = _G.CooldownManagerCentered
   local ns = addon and addon.ns
   if ns and ns.API and type(ns.API.RefreshCooldownManager) == "function" then
@@ -633,5 +989,11 @@ ModeShift.Integrations:Register({
   end,
   applyOption = function(optionName)
     return applyCooldownLayout(optionName)
+  end,
+  getExtraState = function()
+    return getTrackerExtraState()
+  end,
+  applyExtraState = function(state)
+    return applyTrackerExtraState(state)
   end,
 })

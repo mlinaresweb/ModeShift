@@ -255,10 +255,23 @@ function ProfileManager:CaptureCurrentAddonProfiles(profile)
   for _, addon in ipairs(ModeShift.AddonManager:GetInstalledAddons(true)) do
     local currentProfile = ModeShift.AddonProfileManager:GetCurrentProfile(addon.name)
     local profiles = ModeShift.AddonProfileManager:GetAvailableProfiles(addon.name)
-    if currentProfile or #profiles > 0 then
+    local currentOption = ModeShift.AddonProfileManager:GetCurrentOption(addon.name)
+    local options = ModeShift.AddonProfileManager:GetAvailableOptions(addon.name)
+    local extraState = nil
+    local integration = ModeShift.Integrations and ModeShift.Integrations:Get(addon.name) or nil
+    if integration and type(integration.getExtraState) == "function" then
+      local ok, state = ModeShift:SafeCall("getExtraState", integration.getExtraState)
+      if ok and type(state) == "table" then
+        extraState = state
+      end
+    end
+
+    if currentProfile or #profiles > 0 or currentOption or #options > 0 or extraState then
       profile.addonProfiles.entries[addon.name] = {
-        enabled = currentProfile ~= nil,
+        enabled = currentProfile ~= nil or currentOption ~= nil or extraState ~= nil,
         profileName = currentProfile,
+        optionName = currentOption,
+        extraState = extraState,
       }
     end
   end

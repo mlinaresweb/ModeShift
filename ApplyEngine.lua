@@ -102,10 +102,10 @@ function ApplyEngine:StartReloadPrompt()
   end
 
   if C_Timer and C_Timer.After then
-    C_Timer.After(1.2, function()
+    C_Timer.After(0.25, function()
       self:TryReload()
     end)
-    C_Timer.After(4.0, function()
+    C_Timer.After(1.2, function()
       self:TryReload()
     end)
   else
@@ -132,7 +132,7 @@ function ApplyEngine:CompleteDeferredReload()
     end
 
     if C_Timer and C_Timer.After then
-      C_Timer.After(0.8, function()
+      C_Timer.After(0.45, function()
         self:CompleteDeferredReload()
       end)
     else
@@ -167,10 +167,10 @@ function ApplyEngine:ScheduleReload(options)
     end
 
     if C_Timer and C_Timer.After then
-      C_Timer.After(5.0, function()
+      C_Timer.After(0.8, function()
         self:CompleteDeferredReload()
       end)
-      C_Timer.After(9.0, function()
+      C_Timer.After(2.5, function()
         self:CompleteDeferredReload()
       end)
     else
@@ -188,7 +188,7 @@ function ApplyEngine:OnTalentCommitEvent()
   end
 
   if C_Timer and C_Timer.After then
-    C_Timer.After(1.0, function()
+    C_Timer.After(0.25, function()
       self:CompleteDeferredReload()
     end)
   else

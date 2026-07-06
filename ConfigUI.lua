@@ -99,10 +99,48 @@ local function makeText(parent, text, font)
   return label
 end
 
+local function applyIconTexture(icon, texture)
+  if type(texture) == "table" then
+    if texture.atlas and icon.SetAtlas then
+      local ok = pcall(icon.SetAtlas, icon, texture.atlas)
+      if ok then
+        return true
+      end
+    end
+    for _, candidate in ipairs(texture) do
+      if applyIconTexture(icon, candidate) then
+        return true
+      end
+    end
+    return false
+  end
+
+  if type(texture) == "number" then
+    local ok = pcall(icon.SetTexture, icon, texture)
+    return ok
+  end
+
+  if type(texture) == "string" and texture ~= "" then
+    if not texture:find("\\") and not texture:find("/") and icon.SetAtlas then
+      local atlasOk = pcall(icon.SetAtlas, icon, texture)
+      if atlasOk then
+        return true
+      end
+    end
+
+    local ok, loaded = pcall(icon.SetTexture, icon, texture)
+    return ok and (loaded == true or texture:find("^Interface\\Icons\\"))
+  end
+
+  return false
+end
+
 local function makeIcon(parent, texture, size)
   local icon = parent:CreateTexture(nil, "ARTWORK")
   icon:SetSize(size or 18, size or 18)
-  icon:SetTexture(texture or "Interface\\Icons\\INV_Misc_QuestionMark")
+  if not applyIconTexture(icon, texture) then
+    icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+  end
   if icon.SetTexCoord then
     icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
   end
@@ -729,17 +767,29 @@ function ConfigUI:CaptureSelectedProfile(useNow)
     return
   end
 
-  ModeShift.ProfileManager:CaptureCurrentState(profile)
+  if ModeShift.AddonProfileManager and ModeShift.AddonProfileManager.ClearCache then
+    ModeShift.AddonProfileManager:ClearCache()
+  end
+  if ModeShift.ProfileManager and ModeShift.ProfileManager.CaptureCurrentAddonProfiles then
+    ModeShift.ProfileManager:CaptureCurrentAddonProfiles(profile)
+  end
+
+  ModeShift.ProfileManager:SaveProfile(profile)
   if useNow then
-    ModeShift.ProfileManager:UseProfileNow(profile)
-    ModeShift:Print("perfil guardado y marcado como actual: " .. tostring(profile.name or profile.id))
+    ModeShift:Print("perfil guardado, aplicando ahora: " .. tostring(profile.name or profile.id))
+    if ModeShift.ApplyEngine then
+      ModeShift.ApplyEngine:ApplyProfile(profile.id, { source = "save-and-use" })
+    else
+      ModeShift.ProfileManager:UseProfileNow(profile)
+    end
   else
-    ModeShift.ProfileManager:SaveProfile(profile)
-    ModeShift:Print("perfil actualizado desde el estado actual: " .. tostring(profile.name or profile.id))
+    ModeShift:Print("perfil actualizado: " .. tostring(profile.name or profile.id))
   end
 
   self.selectedProfileId = profile.id
-  self:Refresh()
+  if not useNow then
+    self:Refresh()
+  end
 end
 
 function ConfigUI:Refresh()
@@ -825,6 +875,94 @@ function ConfigUI:AddLabeledEdit(parent, labelText, value, y, width)
   local editBox = makeEditBox(parent, width or 340, value)
   editBox:SetPoint("TOPLEFT", 180, y + 4)
   return editBox, y - 34
+end
+
+function ConfigUI:AfterOpeningBlizzardPanel()
+  if self.frame then
+    self.frame:Show()
+  end
+
+  local function refresh()
+    if self.frame and self.frame:IsShown() then
+      self:RefreshEditor()
+    end
+  end
+
+  if C_Timer and C_Timer.After then
+    C_Timer.After(0.25, refresh)
+    C_Timer.After(1.0, refresh)
+  else
+    refresh()
+  end
+end
+
+function ConfigUI:LoadBlizzardAddon(addonName)
+  if not addonName then
+    return
+  end
+
+  if C_AddOns and C_AddOns.IsAddOnLoaded and C_AddOns.LoadAddOn then
+    local loaded = C_AddOns.IsAddOnLoaded(addonName)
+    if not loaded then
+      pcall(C_AddOns.LoadAddOn, addonName)
+    end
+  elseif IsAddOnLoaded and LoadAddOn and not IsAddOnLoaded(addonName) then
+    pcall(LoadAddOn, addonName)
+  end
+end
+
+function ConfigUI:OpenBlizzardEquipmentManager()
+  self:LoadBlizzardAddon("Blizzard_InspectUI")
+  if ToggleCharacter then
+    pcall(ToggleCharacter, "PaperDollFrame")
+  elseif CharacterFrame and ShowUIPanel then
+    pcall(ShowUIPanel, CharacterFrame)
+  end
+
+  if PaperDollFrame_SetSidebar and PaperDollFrame then
+    pcall(PaperDollFrame_SetSidebar, PaperDollFrame, 3)
+  end
+  if EquipmentManagerFrame and EquipmentManagerFrame.Show then
+    pcall(EquipmentManagerFrame.Show, EquipmentManagerFrame)
+  end
+  if GearManagerDialogPopup and GearManagerDialogPopup.Show then
+    pcall(GearManagerDialogPopup.Show, GearManagerDialogPopup)
+  end
+
+  self:AfterOpeningBlizzardPanel()
+end
+
+function ConfigUI:OpenBlizzardTalents()
+  self:LoadBlizzardAddon("Blizzard_PlayerSpells")
+  self:LoadBlizzardAddon("Blizzard_ClassTalentUI")
+
+  if PlayerSpellsUtil and PlayerSpellsUtil.OpenToClassTalentsTab then
+    pcall(PlayerSpellsUtil.OpenToClassTalentsTab)
+  elseif TogglePlayerSpellsFrame then
+    pcall(TogglePlayerSpellsFrame)
+  elseif ToggleTalentFrame then
+    pcall(ToggleTalentFrame)
+  elseif PlayerSpellsFrame and ShowUIPanel then
+    pcall(ShowUIPanel, PlayerSpellsFrame)
+  elseif ClassTalentFrame and ShowUIPanel then
+    pcall(ShowUIPanel, ClassTalentFrame)
+  end
+
+  self:AfterOpeningBlizzardPanel()
+end
+
+function ConfigUI:OpenBlizzardEditMode()
+  self:LoadBlizzardAddon("Blizzard_EditMode")
+
+  if EditModeManagerFrame and ShowUIPanel then
+    pcall(ShowUIPanel, EditModeManagerFrame)
+  elseif EditModeManagerFrame and EditModeManagerFrame.Show then
+    pcall(EditModeManagerFrame.Show, EditModeManagerFrame)
+  elseif C_EditMode and C_EditMode.EnterEditMode then
+    pcall(C_EditMode.EnterEditMode)
+  end
+
+  self:AfterOpeningBlizzardPanel()
 end
 
 function ConfigUI:DeleteSelectedProfile()
@@ -1007,6 +1145,16 @@ function ConfigUI:BuildEquipmentTab(parent, profile, y)
     self:SaveProfile(profile)
   end)
   disabledButton:SetPoint("TOPLEFT", 4, y)
+
+  local openEquipmentButton = makeButton(parent, "Crear/gestionar sets", 170, 24, function()
+    self:OpenBlizzardEquipmentManager()
+  end)
+  openEquipmentButton:SetPoint("LEFT", disabledButton, "RIGHT", 8, 0)
+
+  local refreshButton = makeButton(parent, "Actualizar", 100, 24, function()
+    self:RefreshEditor()
+  end)
+  refreshButton:SetPoint("LEFT", openEquipmentButton, "RIGHT", 8, 0)
   y = y - 36
 
   local sets = ModeShift.EquipmentManager:GetEquipmentSets()
@@ -1068,6 +1216,16 @@ function ConfigUI:BuildTalentsTab(parent, profile, y)
     self:SaveProfile(profile)
   end)
   autoCheck:SetPoint("TOPLEFT", 180, y + 3)
+
+  local openTalentsButton = makeButton(parent, "Abrir talentos", 135, 24, function()
+    self:OpenBlizzardTalents()
+  end)
+  openTalentsButton:SetPoint("TOPLEFT", 395, y)
+
+  local refreshButton = makeButton(parent, "Actualizar", 100, 24, function()
+    self:RefreshEditor()
+  end)
+  refreshButton:SetPoint("LEFT", openTalentsButton, "RIGHT", 8, 0)
   y = y - 38
 
   local loadouts = ModeShift.TalentManager:GetTalentLoadouts(ModeShift:GetCurrentSpecId())
@@ -1127,6 +1285,16 @@ function ConfigUI:BuildUITab(parent, profile, y)
     self:RefreshEditor()
   end)
   disabledButton:SetPoint("TOPLEFT", 4, y)
+
+  local openEditModeButton = makeButton(parent, "Abrir modo edicion", 160, 24, function()
+    self:OpenBlizzardEditMode()
+  end)
+  openEditModeButton:SetPoint("LEFT", disabledButton, "RIGHT", 8, 0)
+
+  local refreshButton = makeButton(parent, "Actualizar", 100, 24, function()
+    self:RefreshEditor()
+  end)
+  refreshButton:SetPoint("LEFT", openEditModeButton, "RIGHT", 8, 0)
   y = y - 36
 
   local layouts = ModeShift.EditModeManager and ModeShift.EditModeManager:GetLayouts() or {}
@@ -1173,6 +1341,7 @@ function ConfigUI:BuildAddonsTab(parent, profile, y)
 
   local captureButton = makeButton(parent, "Actualizar desde estado actual", 190, 22, function()
     ModeShift.ProfileManager:CaptureCurrentAddons(profile)
+    ModeShift.ProfileManager:CaptureCurrentAddonProfiles(profile)
     self:SaveProfile(profile)
   end)
   captureButton:SetPoint("TOPLEFT", 320, y + 5)
@@ -1319,6 +1488,7 @@ function ConfigUI:SetAddonProfile(profile, addonName, profileName)
     enabled = true,
     profileName = entry.profileName,
     optionName = entry.optionName,
+    extraState = entry.extraState,
   }
   self:SaveProfile(profile)
 end
@@ -1573,6 +1743,27 @@ function ConfigUI:BuildHelpTab(parent, profile, y)
   }
 
   for _, tip in ipairs(tips) do
+    local row = makeText(parent, "- " .. tip)
+    row:SetPoint("TOPLEFT", 4, y)
+    row:SetWidth(650)
+    y = y - 22
+  end
+
+  y = y - 8
+  y = self:AddSection(parent, "Cooldown Manager / CDS", y)
+  local cdmTips = {
+    "En la pestana Addons, CooldownManagerCentered permite elegir el perfil interno y el diseno CDM.",
+    "ModeShift guarda por perfil los trackers de CDM/CDS, su posicion, tamano, direccion y estilo.",
+    "Los trackers se colocan desde el modo edicion de Blizzard/CDM: abre /cdm o /cds, entra en modo edicion y mueve los trackers en pantalla.",
+    "Despues de mover trackers o cambiar su tamano/direccion, vuelve a ModeShift y pulsa Actualizar perfil para guardar esa colocacion.",
+    "Tambien guarda por perfil la colocacion de Hechizos y Beneficios: esenciales, utilidad, iconos, barras y no mostrados.",
+    "Hechizos y Beneficios se organizan dentro de /cdm o /cds arrastrandolos entre secciones; ModeShift captura esa organizacion por perfil.",
+    "La captura usa IDs y claves internas del addon, asi que funciona igual aunque el juego este en otro idioma.",
+    "Si cambias algo dentro de /cdm o /cds, vuelve a ModeShift y pulsa Actualizar perfil para guardar ese estado en el perfil seleccionado.",
+    "Guardar y usar guarda el estado actual de CDM/CDS y aplica ese perfil de ModeShift como perfil activo.",
+  }
+
+  for _, tip in ipairs(cdmTips) do
     local row = makeText(parent, "- " .. tip)
     row:SetPoint("TOPLEFT", 4, y)
     row:SetWidth(650)

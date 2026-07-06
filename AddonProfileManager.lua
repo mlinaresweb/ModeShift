@@ -263,6 +263,20 @@ function AddonProfileManager:Apply(profile)
           end
         end
       end
+
+      if entry.extraState and integration and type(integration.applyExtraState) == "function" then
+        local ok, appliedOrErr, extraErr = ModeShift:SafeCall("applyExtraState", integration.applyExtraState, entry.extraState)
+        if ok and appliedOrErr ~= false then
+          table.insert(result.applied, "Estado " .. tostring(integration.displayName or addonName) .. ": aplicado")
+          if extraErr then
+            result.requiresReload = true
+            table.insert(result.warnings, tostring(integration.displayName or addonName) .. " estado: " .. tostring(extraErr))
+          end
+        else
+          result.success = false
+          table.insert(result.warnings, tostring(integration.displayName or addonName) .. " estado: " .. tostring(extraErr or appliedOrErr or "no aplicado"))
+        end
+      end
     end
   end
 
