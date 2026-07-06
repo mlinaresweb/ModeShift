@@ -29,6 +29,26 @@ local function normalizeName(value)
   return tostring(value or ""):lower():gsub("[^%w]", "")
 end
 
+local function stripWowColors(value)
+  value = tostring(value or "")
+  value = value:gsub("|c%x%x%x%x%x%x%x%x", "")
+  value = value:gsub("|r", "")
+  value = value:gsub("|A:[^|]+|a", "")
+  return value
+end
+
+local function acronym(value)
+  value = stripWowColors(value)
+  local letters = {}
+  for letter in value:gmatch("%u") do
+    table.insert(letters, letter:lower())
+  end
+  if #letters >= 2 then
+    return table.concat(letters)
+  end
+  return nil
+end
+
 local function addUnique(list, seen, value)
   if value == nil then
     return
@@ -63,11 +83,43 @@ end
 
 local profileContainerKeys = {
   profiles = true,
+  Profiles = true,
   profileData = true,
+  ProfileData = true,
   profileDataByName = true,
   profileSettings = true,
   profileDB = true,
 }
+
+local currentProfileKeys = {
+  currentProfile = true,
+  CurrentProfile = true,
+  activeProfile = true,
+  ActiveProfile = true,
+  selectedProfile = true,
+  SelectedProfile = true,
+  profileName = true,
+  ProfileName = true,
+}
+
+local function addNamesFromProfileArray(value, out, seen)
+  if type(value) ~= "table" then
+    return false
+  end
+
+  local found = false
+  for _, entry in ipairs(value) do
+    if type(entry) == "table" and (entry.name or entry.profileName or entry.profile) then
+      addUnique(out, seen, entry.name or entry.profileName or entry.profile)
+      found = true
+    elseif type(entry) == "string" or type(entry) == "number" then
+      addUnique(out, seen, entry)
+      found = true
+    end
+  end
+
+  return found
+end
 
 local function collectProfileNames(source, out, seen, depth, state)
   if type(source) ~= "table" or depth > 4 then
@@ -78,6 +130,9 @@ local function collectProfileNames(source, out, seen, depth, state)
   if state.nodes > 260 or #out >= 120 then
     return
   end
+
+  addNamesFromProfileArray(source.ProfileData, out, seen)
+  addNamesFromProfileArray(source.profileData, out, seen)
 
   if type(source.profileKeys) == "table" then
     for _, profileName in pairs(source.profileKeys) do
@@ -91,7 +146,9 @@ local function collectProfileNames(source, out, seen, depth, state)
     if type(key) == "string" and type(value) == "table" then
       local normalized = normalizeName(key)
       if profileContainerKeys[key] or normalized == "profiles" or normalized:find("profiles", 1, true) then
-        if looksLikeProfileMap(value) then
+        if addNamesFromProfileArray(value, out, seen) then
+          -- handled array-style profile data
+        elseif looksLikeProfileMap(value) then
           for profileName in pairs(value) do
             if type(profileName) == "string" or type(profileName) == "number" then
               addUnique(out, seen, profileName)
@@ -229,11 +286,128 @@ function Integrations:GetCurrentProfileFromDB(db)
     return tostring(db.global.currentProfile)
   end
 
-  if db.currentProfile then
-    return tostring(db.currentProfile)
+  for key in pairs(currentProfileKeys) do
+    if db[key] ~= nil then
+      return tostring(db[key])
+    end
   end
 
   return nil
+end
+
+local function addCandidate(candidates, seen, candidate)
+  if type(candidate) ~= "table" or seen[candidate] then
+    return
+  end
+
+  seen[candidate] = true
+  table.insert(candidates, candidate)
+end
+
+local function objectHasProfileCapabilities(candidate)
+  if type(candidate) ~= "table" then
+    return false
+  end
+
+  if type(candidate.GetProfiles) == "function"
+    or type(candidate.GetProfileNames) == "function"
+    or type(candidate.GetCurrentProfile) == "function"
+    or type(candidate.GetActiveProfile) == "function"
+    or type(candidate.SetProfile) == "function"
+    or type(candidate.SwitchProfile) == "function"
+    or type(candidate.ChangeProfile) == "function"
+    or type(candidate.ApplyProfile) == "function"
+    or type(candidate.ProfileData) == "table"
+  then
+    return true
+  end
+
+  return false
+end
+
+function Integrations:GetGenericProfileObjects(addonName)
+  local aliases = {}
+  aliases[normalizeName(addonName)] = true
+
+  local title = self:GetAddonMetadata(addonName, "Title")
+  if title then
+    aliases[normalizeName(stripWowColors(title))] = true
+  end
+
+  local addonAcronym = acronym(addonName)
+  if addonAcronym then
+    aliases[addonAcronym] = true
+  end
+
+  local titleAcronym = acronym(title or "")
+  if titleAcronym then
+    aliases[titleAcronym] = true
+  end
+
+  local candidates = {}
+  local seen = {}
+  addCandidate(candidates, seen, _G[addonName])
+  addCandidate(candidates, seen, self:GetAceAddon(addonName))
+  if addonAcronym then
+    addCandidate(candidates, seen, _G[addonAcronym])
+    addCandidate(candidates, seen, _G[string.upper(addonAcronym)])
+  end
+  if titleAcronym then
+    addCandidate(candidates, seen, _G[titleAcronym])
+    addCandidate(candidates, seen, _G[string.upper(titleAcronym)])
+  end
+
+  for variableName in pairs(aliases) do
+    addCandidate(candidates, seen, _G[variableName])
+    addCandidate(candidates, seen, _G[string.upper(variableName)])
+  end
+
+  return candidates
+end
+
+function Integrations:GetProfilesFromObject(object)
+  local profiles = {}
+  local seen = {}
+
+  if type(object) ~= "table" then
+    return profiles
+  end
+
+  local methods = { "GetProfiles", "GetProfileNames" }
+  for _, methodName in ipairs(methods) do
+    if type(object[methodName]) == "function" then
+      local ok, result = ModeShift:SafeCall(methodName, object[methodName], object)
+      if ok and type(result) == "table" then
+        for _, profileName in pairs(result) do
+          addUnique(profiles, seen, profileName)
+        end
+      end
+    end
+  end
+
+  addNamesFromProfileArray(object.ProfileData, profiles, seen)
+  addNamesFromProfileArray(object.profileData, profiles, seen)
+  collectProfileNames(object, profiles, seen, 1, { nodes = 0 })
+  table.sort(profiles)
+  return profiles
+end
+
+function Integrations:GetCurrentProfileFromObject(object)
+  if type(object) ~= "table" then
+    return nil
+  end
+
+  local methods = { "GetCurrentProfile", "GetActiveProfile", "GetSelectedProfile", "CurrentProfile" }
+  for _, methodName in ipairs(methods) do
+    if type(object[methodName]) == "function" then
+      local ok, result = ModeShift:SafeCall(methodName, object[methodName], object)
+      if ok and result then
+        return tostring(result)
+      end
+    end
+  end
+
+  return self:GetCurrentProfileFromDB(object)
 end
 
 function Integrations:GetProfilesFromAceDB(dbObject)
@@ -378,6 +552,12 @@ function Integrations:GetAceAddon(addonName)
 end
 
 function Integrations:GetGenericProfileSource(addonName)
+  for _, object in ipairs(self:GetGenericProfileObjects(addonName)) do
+    if type(object.db) == "table" then
+      return object.db, "AceDB"
+    end
+  end
+
   local addonObject = _G[addonName] or self:GetAceAddon(addonName)
   if type(addonObject) == "table" and type(addonObject.db) == "table" then
     return addonObject.db, "AceDB"
@@ -487,19 +667,55 @@ function Integrations:DeepFindGenericDBSource(addonName)
 end
 
 function Integrations:GetGenericProfiles(addonName, deepScan)
-  local source = deepScan and self:DeepFindGenericProfileSource(addonName) or self:GetGenericProfileSource(addonName)
-  if not source then
-    return {}
+  local profiles = {}
+  local seen = {}
+  for _, object in ipairs(self:GetGenericProfileObjects(addonName)) do
+    local objectProfiles = self:GetProfilesFromObject(object)
+    for _, profileName in ipairs(objectProfiles) do
+      addUnique(profiles, seen, profileName)
+    end
   end
-  return self:GetProfilesFromAceDB(source)
+
+  local source = deepScan and self:DeepFindGenericProfileSource(addonName) or self:GetGenericProfileSource(addonName)
+  if source then
+    local dbProfiles = self:GetProfilesFromAceDB(source)
+    for _, profileName in ipairs(dbProfiles) do
+      addUnique(profiles, seen, profileName)
+    end
+  end
+
+  table.sort(profiles)
+  return profiles
 end
 
 function Integrations:GetGenericCurrentProfile(addonName, deepScan)
-  local source = deepScan and self:DeepFindGenericProfileSource(addonName) or self:GetGenericProfileSource(addonName)
-  if not source then
-    return nil
+  for _, object in ipairs(self:GetGenericProfileObjects(addonName)) do
+    local profileName = self:GetCurrentProfileFromObject(object)
+    if profileName then
+      return profileName
+    end
   end
-  return self:GetCurrentProfileFromAceDB(source)
+
+  local source = deepScan and self:DeepFindGenericProfileSource(addonName) or self:GetGenericProfileSource(addonName)
+  if source then
+    local profileName = self:GetCurrentProfileFromAceDB(source)
+    if profileName then
+      return profileName
+    end
+  end
+
+  local perCharacter = splitCSV(self:GetAddonMetadata(addonName, "SavedVariablesPerCharacter"))
+  for _, variableName in ipairs(perCharacter) do
+    local normalized = normalizeName(variableName)
+    local value = _G[variableName]
+    if (normalized:find("profile", 1, true) or normalized:find("layout", 1, true))
+      and (type(value) == "string" or type(value) == "number")
+    then
+      return tostring(value)
+    end
+  end
+
+  return nil
 end
 
 function Integrations:GetGenericOptions(addonName, deepScan)
@@ -554,7 +770,75 @@ function Integrations:ApplyGenericOption(addonName, optionName)
   return false, "Opcion detectada, pero el addon no expone API segura para aplicarla"
 end
 
+function Integrations:ApplyProfileOnObject(object, profileName)
+  if type(object) ~= "table" then
+    return false, "Objeto no valido"
+  end
+
+  local methods = {
+    { name = "SetProfile", passSelf = true },
+    { name = "SwitchProfile", passSelf = true },
+    { name = "ChangeProfile", passSelf = true },
+    { name = "ApplyProfile", passSelf = false },
+    { name = "ApplyProfile", passSelf = true },
+    { name = "SelectProfile", passSelf = true },
+    { name = "LoadProfile", passSelf = true },
+  }
+
+  for _, method in ipairs(methods) do
+    local methodName = method.name
+    if type(object[methodName]) == "function" then
+      if method.passSelf then
+        return ModeShift:SafeCall(methodName, object[methodName], object, profileName)
+      end
+      return ModeShift:SafeCall(methodName, object[methodName], profileName)
+    end
+  end
+
+  return false, "El addon no expone metodo de cambio de perfil"
+end
+
+function Integrations:SetMetadataCurrentProfile(addonName, profileName)
+  local variables = splitCSV(self:GetAddonMetadata(addonName, "SavedVariablesPerCharacter"))
+  local savedVariables = splitCSV(self:GetAddonMetadata(addonName, "SavedVariables"))
+  for _, variableName in ipairs(savedVariables) do
+    table.insert(variables, variableName)
+  end
+
+  local changed = false
+  for _, variableName in ipairs(variables) do
+    local normalized = normalizeName(variableName)
+    if normalized:find("profile", 1, true) or normalized:find("layout", 1, true) then
+      local value = _G[variableName]
+      if type(value) == "string" or type(value) == "number" or value == nil then
+        _G[variableName] = profileName
+        changed = true
+      end
+    end
+  end
+
+  return changed
+end
+
 function Integrations:ApplyGenericProfile(addonName, profileName)
+  local available = self:GetGenericProfiles(addonName, true)
+  local profileExistsInObjects = false
+  for _, name in ipairs(available) do
+    if name == profileName then
+      profileExistsInObjects = true
+      break
+    end
+  end
+
+  for _, object in ipairs(self:GetGenericProfileObjects(addonName)) do
+    if profileExistsInObjects then
+      local ok, appliedOrErr, extraErr = self:ApplyProfileOnObject(object, profileName)
+      if ok and appliedOrErr ~= false then
+        return true, extraErr
+      end
+    end
+  end
+
   local source, sourceName = self:DeepFindGenericProfileSource(addonName)
   if not source then
     return false, "No encuentro perfiles compatibles"
@@ -574,14 +858,32 @@ function Integrations:ApplyGenericProfile(addonName, profileName)
     end
   end
 
-  if profileExists and type(db.profileKeys) == "table" then
-    db.profileKeys[ModeShift:GetPlayerKey()] = profileName
-    if db.currentProfile ~= nil then
-      db.currentProfile = profileName
+  if profileExists then
+    if type(db.profileKeys) == "table" then
+      db.profileKeys[ModeShift:GetPlayerKey()] = profileName
     end
+
+    local wroteCurrentKey = false
+    for key in pairs(currentProfileKeys) do
+      if db[key] ~= nil then
+        db[key] = profileName
+        wroteCurrentKey = true
+      end
+    end
+
     if type(db.global) == "table" and db.global.currentProfile ~= nil then
       db.global.currentProfile = profileName
+      wroteCurrentKey = true
     end
+
+    if self:SetMetadataCurrentProfile(addonName, profileName) then
+      wroteCurrentKey = true
+    end
+
+    if wroteCurrentKey or type(db.profileKeys) == "table" then
+      return true, "Perfil escrito en " .. tostring(sourceName) .. "; puede requerir reload"
+    end
+
     return true, "Perfil escrito en " .. tostring(sourceName) .. "; puede requerir reload"
   end
 

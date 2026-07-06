@@ -161,6 +161,49 @@ function AddonManager:ShouldLoadInProfile(profile, addon)
   return false
 end
 
+local function buildAddonState(profile)
+  local state = {}
+  local addons = profile and profile.addons or nil
+  if not addons or not addons.enabled then
+    return state
+  end
+
+  for _, addonName in ipairs(ModeShift.Utils:SafeArray(addons.enable)) do
+    state[addonName] = true
+  end
+
+  return state
+end
+
+function AddonManager:ProfilesHaveDifferentAddonState(leftProfile, rightProfile)
+  if not leftProfile or not rightProfile then
+    return false
+  end
+
+  local leftAddons = leftProfile.addons
+  local rightAddons = rightProfile.addons
+  if not (leftAddons and leftAddons.enabled and rightAddons and rightAddons.enabled) then
+    return false
+  end
+
+  local leftState = buildAddonState(leftProfile)
+  local rightState = buildAddonState(rightProfile)
+
+  for addonName, enabled in pairs(leftState) do
+    if rightState[addonName] ~= enabled then
+      return true
+    end
+  end
+
+  for addonName, enabled in pairs(rightState) do
+    if leftState[addonName] ~= enabled then
+      return true
+    end
+  end
+
+  return false
+end
+
 function AddonManager:GetInstalledAddons(forceRefresh)
   if self.installedCache and not forceRefresh then
     return copyAddonList(self.installedCache)

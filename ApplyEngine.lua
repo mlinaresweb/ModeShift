@@ -11,6 +11,10 @@ local function appendAll(target, source)
   end
 end
 
+local function hasAppliedWork(part)
+  return type(part) == "table" and type(part.applied) == "table" and #part.applied > 0
+end
+
 function ApplyEngine:NewResult(profileId)
   return {
     profileId = profileId,
@@ -21,6 +25,23 @@ function ApplyEngine:NewResult(profileId)
     errors = {},
     warnings = {},
   }
+end
+
+function ApplyEngine:TryReload()
+  if ModeShift.Database and not ModeShift.Database:GetRequiresReload() then
+    return
+  end
+
+  self.waitingForTalentReload = nil
+  self.deferredReloadPending = nil
+
+  local ok, err = ModeShift:SafeCall("ReloadUI", ReloadUI)
+  if not ok then
+    ModeShift:Print("no he podido recargar automaticamente: " .. tostring(err) .. ". Usa el boton Reload UI.")
+    if ModeShift.RefreshConfig then
+      ModeShift:RefreshConfig()
+    end
+  end
 end
 
 function ApplyEngine:MergeResult(result, part)
@@ -64,6 +85,90 @@ function ApplyEngine:ApplyCVars(profile, result)
   end
 end
 
+function ApplyEngine:StartReloadPrompt()
+  if not ModeShift.Database then
+    ReloadUI()
+    return
+  end
+
+  ModeShift.Database:SetRequiresReload(true)
+
+  if ModeShift.RefreshConfig then
+    ModeShift:RefreshConfig()
+  end
+
+  if ModeShift.ShowReloadPopup then
+    ModeShift:ShowReloadPopup()
+  end
+
+  if C_Timer and C_Timer.After then
+    C_Timer.After(1.2, function()
+      self:TryReload()
+    end)
+    C_Timer.After(4.0, function()
+      self:TryReload()
+    end)
+  else
+    self:TryReload()
+  end
+end
+
+function ApplyEngine:CompleteDeferredReload()
+  if not self.deferredReloadPending then
+    return
+  end
+
+  self.deferredReloadPending = nil
+  self.waitingForTalentReload = nil
+  ModeShift:Print("talentos aplicados: recargando interfaz automaticamente...")
+  self:StartReloadPrompt()
+end
+
+function ApplyEngine:ScheduleReload(options)
+  options = options or {}
+  if not ModeShift.Database then
+    ReloadUI()
+    return
+  end
+
+  if options.waitForTalents then
+    self.waitingForTalentReload = true
+    self.deferredReloadPending = true
+
+    if ModeShift.RefreshConfig then
+      ModeShift:RefreshConfig()
+    end
+
+    if C_Timer and C_Timer.After then
+      C_Timer.After(5.0, function()
+        self:CompleteDeferredReload()
+      end)
+      C_Timer.After(9.0, function()
+        self:CompleteDeferredReload()
+      end)
+    else
+      self:CompleteDeferredReload()
+    end
+    return
+  end
+
+  self:StartReloadPrompt()
+end
+
+function ApplyEngine:OnTalentCommitEvent()
+  if not self.waitingForTalentReload then
+    return
+  end
+
+  if C_Timer and C_Timer.After then
+    C_Timer.After(1.0, function()
+      self:CompleteDeferredReload()
+    end)
+  else
+    self:CompleteDeferredReload()
+  end
+end
+
 function ApplyEngine:ApplyAddonProfiles(profile, result)
   if not ModeShift.AddonProfileManager then
     table.insert(result.warnings, "AddonProfileManager no esta disponible")
@@ -104,6 +209,15 @@ function ApplyEngine:ApplyProfile(profileId, options)
   end
 
   local result = self:NewResult(profileId)
+  local talentsChanged = false
+  local previousProfile = nil
+  if ModeShift.Database and ModeShift.ProfileManager then
+    local previousProfileId = ModeShift.Database:GetActiveProfileId() or ModeShift.Database:GetLastAppliedProfileId()
+    if previousProfileId and previousProfileId ~= profile.id then
+      previousProfile = ModeShift.ProfileManager:GetProfile(previousProfileId)
+    end
+  end
+
   ModeShift:Print("aplicando perfil " .. (profile.name or profile.id) .. "...")
 
   if ModeShift.EquipmentManager then
@@ -111,7 +225,9 @@ function ApplyEngine:ApplyProfile(profileId, options)
   end
 
   if ModeShift.TalentManager then
-    self:MergeResult(result, ModeShift.TalentManager:Apply(profile))
+    local talentResult = ModeShift.TalentManager:Apply(profile)
+    talentsChanged = hasAppliedWork(talentResult)
+    self:MergeResult(result, talentResult)
   end
 
   self:ApplyEditMode(profile, result)
@@ -119,6 +235,13 @@ function ApplyEngine:ApplyProfile(profileId, options)
 
   if ModeShift.AddonManager then
     self:MergeResult(result, ModeShift.AddonManager:Apply(profile))
+    if not result.requiresReload
+      and previousProfile
+      and ModeShift.AddonManager:ProfilesHaveDifferentAddonState(previousProfile, profile)
+    then
+      result.requiresReload = true
+      table.insert(result.applied, "Addons del perfil cambiados: recarga necesaria")
+    end
   end
 
   self:ApplyCVars(profile, result)
@@ -132,15 +255,12 @@ function ApplyEngine:ApplyProfile(profileId, options)
   self:PrintSummary(result)
 
   if result.requiresReload then
-    ModeShift.Database:SetRequiresReload(false)
-    ModeShift:Print("addons cambiados: recargando interfaz automaticamente...")
-    if C_Timer and C_Timer.After then
-      C_Timer.After(0.2, function()
-        ReloadUI()
-      end)
+    if talentsChanged then
+      ModeShift:Print("addons cambiados: recargare la interfaz al terminar de aplicar talentos...")
     else
-      ReloadUI()
+      ModeShift:Print("addons cambiados: recargando interfaz automaticamente...")
     end
+    self:ScheduleReload({ waitForTalents = talentsChanged })
     return result
   end
 
@@ -187,6 +307,17 @@ function ApplyEngine:PrintSummary(result)
     ModeShift:Print("perfil aplicado.")
   else
     ModeShift:Print("el perfil se ha aplicado parcialmente.")
+  end
+end
+
+function ApplyEngine:OnEvent(event)
+  if event == "PLAYER_TALENT_UPDATE"
+    or event == "TRAIT_CONFIG_UPDATED"
+    or event == "ACTIVE_COMBAT_CONFIG_CHANGED"
+    or event == "PLAYER_SPECIALIZATION_CHANGED"
+    or event == "ACTIVE_PLAYER_SPECIALIZATION_CHANGED"
+  then
+    self:OnTalentCommitEvent()
   end
 end
 

@@ -247,6 +247,9 @@ end
 function ModeShift:OnPlayerLogin()
   if self.Database then
     self.Database:Initialize()
+    if self.Database:GetRequiresReload() then
+      self.Database:SetRequiresReload(false)
+    end
   end
 
   if self.ProfileManager then
@@ -292,7 +295,7 @@ function ModeShift:OnEvent(event, ...)
     self:OnPlayerLogin()
   elseif event == "PLAYER_REGEN_ENABLED" then
     self:OnPlayerRegenEnabled()
-  elseif event == "PLAYER_SPECIALIZATION_CHANGED" then
+  elseif event == "PLAYER_SPECIALIZATION_CHANGED" or event == "ACTIVE_PLAYER_SPECIALIZATION_CHANGED" then
     if self.ProfileManager then
       self.ProfileManager:EnsureExampleProfiles()
     end
@@ -307,9 +310,19 @@ frame:SetScript("OnEvent", function(_, event, ...)
   ModeShift:OnEvent(event, ...)
 end)
 
-frame:RegisterEvent("ADDON_LOADED")
-frame:RegisterEvent("PLAYER_LOGIN")
-frame:RegisterEvent("PLAYER_REGEN_ENABLED")
-frame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
-frame:RegisterEvent("PLAYER_EQUIPMENT_CHANGED")
-frame:RegisterEvent("PLAYER_TALENT_UPDATE")
+local function registerEvent(event)
+  if C_EventUtils and C_EventUtils.IsEventValid and not C_EventUtils.IsEventValid(event) then
+    return
+  end
+  pcall(frame.RegisterEvent, frame, event)
+end
+
+registerEvent("ADDON_LOADED")
+registerEvent("PLAYER_LOGIN")
+registerEvent("PLAYER_REGEN_ENABLED")
+registerEvent("PLAYER_SPECIALIZATION_CHANGED")
+registerEvent("ACTIVE_PLAYER_SPECIALIZATION_CHANGED")
+registerEvent("PLAYER_EQUIPMENT_CHANGED")
+registerEvent("PLAYER_TALENT_UPDATE")
+registerEvent("TRAIT_CONFIG_UPDATED")
+registerEvent("ACTIVE_COMBAT_CONFIG_CHANGED")

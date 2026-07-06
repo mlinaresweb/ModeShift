@@ -90,22 +90,22 @@ local function styleButton(button, selected)
     button.modeShiftSelectedBg = button:CreateTexture(nil, "BACKGROUND")
     button.modeShiftSelectedBg:SetPoint("TOPLEFT", 2, -2)
     button.modeShiftSelectedBg:SetPoint("BOTTOMRIGHT", -2, 2)
-    button.modeShiftSelectedBg:SetColorTexture(0.18, 0.18, 0.18, 0.92)
+    button.modeShiftSelectedBg:SetColorTexture(0.16, 0.16, 0.16, 0.96)
   end
-  button.modeShiftSelectedBg:SetShown(selected and true or false)
+  button.modeShiftSelectedBg:Hide()
 
   local fontString = button:GetFontString()
   if fontString then
     fontString:SetTextColor(1, 0.82, 0)
   end
 
+  if button.SetEnabled then
+    button:SetEnabled(not selected)
+  end
+
   local normal = button.GetNormalTexture and button:GetNormalTexture()
   if normal and normal.SetVertexColor then
-    if selected then
-      normal:SetVertexColor(0.55, 0.55, 0.55, 1)
-    else
-      normal:SetVertexColor(1, 1, 1, 1)
-    end
+    normal:SetVertexColor(1, 1, 1, 1)
   end
 end
 
@@ -120,13 +120,13 @@ local function addHover(button, selected)
       fontString:SetTextColor(1, 1, 1)
     end
     if self.modeShiftSelectedBg then
-      self.modeShiftSelectedBg:SetColorTexture(selected and 0.28 or 0.4, selected and 0.28 or 0.03, selected and 0.28 or 0.02, selected and 0.95 or 0.55)
+      self.modeShiftSelectedBg:SetColorTexture(selected and 0.24 or 0.4, selected and 0.24 or 0.03, selected and 0.24 or 0.02, selected and 0.98 or 0.55)
       self.modeShiftSelectedBg:Show()
     end
     local normal = self.GetNormalTexture and self:GetNormalTexture()
     if normal and normal.SetVertexColor then
       if selected then
-        normal:SetVertexColor(0.7, 0.7, 0.7, 1)
+        normal:SetVertexColor(0.62, 0.62, 0.62, 1)
       else
         normal:SetVertexColor(1.25, 1.25, 1.25, 1)
       end
@@ -134,7 +134,7 @@ local function addHover(button, selected)
   end)
   button:SetScript("OnLeave", function(self)
     if self.modeShiftSelectedBg then
-      self.modeShiftSelectedBg:SetColorTexture(0.18, 0.18, 0.18, 0.92)
+      self.modeShiftSelectedBg:SetColorTexture(0.16, 0.16, 0.16, 0.96)
       self.modeShiftSelectedBg:SetShown(selected and true or false)
     end
     styleButton(self, selected)
@@ -942,7 +942,13 @@ function ConfigUI:BuildTalentsTab(parent, profile, y)
   y = self:AddSection(parent, "Loadout de talentos de Blizzard", y)
   y = self:AddDescription(parent, "Selecciona una configuracion de talentos de la spec actual. Si el perfil pertenece a otra spec, cambia de spec antes de elegir.", y)
 
-  local current = "Seleccion actual: "
+  local activeLoadout = ModeShift.TalentManager and ModeShift.TalentManager:GetCurrentLoadout(ModeShift:GetCurrentSpecId()) or nil
+  local activeLabel = makeText(parent, "Talentos activos ahora: " .. (activeLoadout and activeLoadout.name or "desconocidos"), "GameFontHighlight")
+  activeLabel:SetPoint("TOPLEFT", 4, y)
+  activeLabel:SetWidth(560)
+  y = y - 22
+
+  local current = "Este perfil aplicara: "
   if profile.talents and profile.talents.enabled and profile.talents.configName then
     current = current .. profile.talents.configName
   else
@@ -975,7 +981,9 @@ function ConfigUI:BuildTalentsTab(parent, profile, y)
   end
 
   for _, loadout in ipairs(loadouts) do
-    local selected = profile.talents and profile.talents.enabled and profile.talents.configName == loadout.name
+    local selected = profile.talents
+      and profile.talents.enabled
+      and ((profile.talents.configName and profile.talents.configName == loadout.name) or (profile.talents.configId and profile.talents.configId == loadout.id))
     local button = makeButton(parent, loadout.name, 320, 24, function()
       profile.talents.enabled = true
       profile.talents.configId = loadout.id
@@ -1160,7 +1168,7 @@ function ConfigUI:BuildAddonProfilePicker(parent, profile, addonName, y)
 
   local currentProfile = nil
   if ModeShift.AddonProfileManager then
-    currentProfile = ModeShift.AddonProfileManager:GetCurrentProfile(addonName, true)
+    currentProfile = ModeShift.AddonProfileManager:GetCurrentProfile(addonName, false)
   end
   local text = "Elegir perfil"
   if currentProfile then
@@ -1172,8 +1180,8 @@ function ConfigUI:BuildAddonProfilePicker(parent, profile, addonName, y)
   local currentButton = makeButton(parent, text, 220, 22, function(button)
     self:OpenAddonProfileDropdown(button, profile, addonName)
   end)
-  styleButton(currentButton, hasSavedProfile or currentProfile ~= nil)
-  addHover(currentButton, hasSavedProfile or currentProfile ~= nil)
+  styleButton(currentButton, false)
+  addHover(currentButton, false)
   currentButton:SetPoint("TOPLEFT", 320, y)
 
   return y
@@ -1269,7 +1277,7 @@ function ConfigUI:BuildAddonOptionPicker(parent, profile, addonName, y)
   local entry = profile.addonProfiles.entries[addonName] or { enabled = false, profileName = nil, optionName = nil }
   local currentOption = nil
   if ModeShift.AddonProfileManager then
-    currentOption = ModeShift.AddonProfileManager:GetCurrentOption(addonName, true)
+    currentOption = ModeShift.AddonProfileManager:GetCurrentOption(addonName, false)
   end
   local defaultText = isCooldownManagerAddon(addonName) and "Disenos CDM" or "Config..."
   local selected = currentOption or entry.optionName or defaultText
@@ -1277,8 +1285,8 @@ function ConfigUI:BuildAddonOptionPicker(parent, profile, addonName, y)
   local button = makeButton(parent, selected, 150, 22, function(anchor)
     self:OpenAddonOptionDropdown(anchor, profile, addonName)
   end)
-  styleButton(button, entry.optionName ~= nil or currentOption ~= nil)
-  addHover(button, entry.optionName ~= nil or currentOption ~= nil)
+  styleButton(button, false)
+  addHover(button, false)
   button:SetPoint("TOPLEFT", 560, y)
 end
 
