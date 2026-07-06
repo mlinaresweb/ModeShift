@@ -2,55 +2,112 @@ local ModeShift = _G.ModeShift
 
 local EditModeManager = {}
 
-local function addLayout(layouts, candidate, fallbackIndex)
-  if type(candidate) ~= "table" then
-    return
+local function getLayoutInfo()
+  if not (C_EditMode and C_EditMode.GetLayouts) then
+    return nil
   end
 
-  local name = candidate.layoutName or candidate.name or candidate.displayName
-  local id = candidate.layoutIndex or candidate.layoutId or candidate.id or fallbackIndex
+  local ok, layoutInfo = ModeShift:SafeCall("GetLayouts", C_EditMode.GetLayouts)
+  if ok and type(layoutInfo) == "table" then
+    return layoutInfo
+  end
+
+  return nil
+end
+
+local function getLayoutName(candidate)
+  if type(candidate) ~= "table" then
+    return nil
+  end
+
+  return candidate.layoutName or candidate.name or candidate.displayName
+end
+
+local function namesEqual(left, right)
+  if not left or not right then
+    return false
+  end
+
+  return tostring(left):lower() == tostring(right):lower()
+end
+
+local function getBaseLayoutName(apiIndex)
+  if apiIndex == 1 then
+    return _G.LAYOUT_STYLE_MODERN or "Modern"
+  elseif apiIndex == 2 then
+    return _G.LAYOUT_STYLE_CLASSIC or "Classic"
+  end
+
+  return nil
+end
+
+local function addLayout(layouts, candidate, apiIndex, customIndex, activeIndex)
+  local name = getLayoutName(candidate)
+  local id = apiIndex
   if name or id then
     table.insert(layouts, {
       id = id,
       name = name or tostring(id),
-      active = candidate.active or candidate.isActive or candidate.isCurrent or candidate.selected,
+      customIndex = customIndex,
+      active = (activeIndex ~= nil and id == activeIndex) or (type(candidate) == "table" and (candidate.active or candidate.isActive or candidate.isCurrent or candidate.selected)),
+      layout = candidate,
     })
   end
 end
 
-local function collectLayouts(layouts, value)
+local function addBaseLayouts(layouts, activeIndex)
+  addLayout(layouts, { layoutName = getBaseLayoutName(1) }, 1, nil, activeIndex)
+  addLayout(layouts, { layoutName = getBaseLayoutName(2) }, 2, nil, activeIndex)
+end
+
+local function getCustomApiIndex(candidate, customIndex)
+  if type(candidate) == "table" then
+    local candidateIndex = candidate.layoutIndex or candidate.layoutId or candidate.id
+    if type(candidateIndex) == "number" and candidateIndex >= 3 then
+      return candidateIndex
+    end
+  end
+
+  return customIndex + 2
+end
+
+local function collectCustomLayouts(layouts, value, activeIndex)
   if type(value) ~= "table" then
     return
   end
 
   if value.layouts then
-    collectLayouts(layouts, value.layouts)
+    collectCustomLayouts(layouts, value.layouts, value.activeLayout or activeIndex)
     return
   end
 
-  if value.layoutName or value.name or value.displayName then
-    addLayout(layouts, value)
+  if getLayoutName(value) then
+    local apiIndex = value.layoutIndex or value.layoutId or value.id
+    addLayout(layouts, value, apiIndex, nil, activeIndex)
     return
   end
 
-  for index, candidate in pairs(value) do
-    addLayout(layouts, candidate, index)
+  for customIndex, candidate in ipairs(value) do
+    addLayout(layouts, candidate, getCustomApiIndex(candidate, customIndex), customIndex, activeIndex)
   end
 end
 
 function EditModeManager:GetLayouts()
   local layouts = {}
 
-  if C_EditMode and C_EditMode.GetLayouts then
-    local ok, result1, result2, result3 = ModeShift:SafeCall("GetLayouts", C_EditMode.GetLayouts)
-    if ok then
-      collectLayouts(layouts, result1)
-      collectLayouts(layouts, result2)
-      collectLayouts(layouts, result3)
-    end
+  local layoutInfo = getLayoutInfo()
+  if layoutInfo then
+    addBaseLayouts(layouts, layoutInfo.activeLayout)
+    collectCustomLayouts(layouts, layoutInfo.layouts or layoutInfo, layoutInfo.activeLayout)
   end
 
   table.sort(layouts, function(a, b)
+    if a.id and b.id and a.id <= 2 and b.id > 2 then
+      return true
+    elseif a.id and b.id and a.id > 2 and b.id <= 2 then
+      return false
+    end
+
     return tostring(a.name or "") < tostring(b.name or "")
   end)
 
@@ -61,14 +118,6 @@ function EditModeManager:FindLayout(editMode)
   editMode = editMode or {}
   local layouts = self:GetLayouts()
 
-  if editMode.layoutId then
-    for _, layout in ipairs(layouts) do
-      if layout.id == editMode.layoutId then
-        return layout
-      end
-    end
-  end
-
   if editMode.layoutName then
     local wanted = string.lower(editMode.layoutName)
     for _, layout in ipairs(layouts) do
@@ -78,11 +127,40 @@ function EditModeManager:FindLayout(editMode)
     end
   end
 
+  if editMode.layoutId then
+    for _, layout in ipairs(layouts) do
+      if tostring(layout.id) == tostring(editMode.layoutId) then
+        return layout
+      end
+    end
+  end
+
   return nil
 end
 
 function EditModeManager:GetCurrentLayout()
-  local layouts = self:GetLayouts()
+  local layoutInfo = getLayoutInfo()
+  if layoutInfo and layoutInfo.activeLayout then
+    local activeIndex = layoutInfo.activeLayout
+    local activeLayout = nil
+    local name = getBaseLayoutName(activeIndex)
+
+    if not name and type(layoutInfo.layouts) == "table" then
+      local customIndex = activeIndex - 2
+      activeLayout = customIndex > 0 and layoutInfo.layouts[customIndex] or nil
+      name = getLayoutName(activeLayout)
+    end
+
+    if name or activeIndex then
+      return {
+        id = activeIndex,
+        name = name or tostring(activeIndex),
+        customIndex = activeIndex > 2 and activeIndex - 2 or nil,
+        active = true,
+        layout = activeLayout,
+      }
+    end
+  end
 
   local candidates = {}
   if C_EditMode then
@@ -105,6 +183,7 @@ function EditModeManager:GetCurrentLayout()
     end
   end
 
+  local layouts = self:GetLayouts()
   for _, candidate in ipairs(candidates) do
     if type(candidate) == "table" then
       local layout = self:FindLayout({
@@ -153,11 +232,25 @@ function EditModeManager:ApplyLayoutByName(layoutName)
     return false, "No encuentro el layout " .. tostring(layoutName)
   end
 
-  local ok, err = ModeShift:SafeCall("SetActiveLayout", C_EditMode.SetActiveLayout, layout.id)
-  if ok then
-    return true
+  return self:SetActiveLayout(layout)
+end
+
+function EditModeManager:SetActiveLayout(layout)
+  if not layout or not layout.id then
+    return false, "Layout sin indice valido"
   end
-  return false, err
+
+  local ok, err = ModeShift:SafeCall("SetActiveLayout", C_EditMode.SetActiveLayout, layout.id)
+  if not ok then
+    return false, err
+  end
+
+  local current = self:GetCurrentLayout()
+  if current and layout.name and not namesEqual(current.name, layout.name) then
+    return false, "Blizzard dejo activo \"" .. tostring(current.name) .. "\" al intentar activar \"" .. tostring(layout.name) .. "\""
+  end
+
+  return true
 end
 
 function EditModeManager:Apply(profile)
@@ -186,7 +279,7 @@ function EditModeManager:Apply(profile)
     return result
   end
 
-  local ok, err = ModeShift:SafeCall("SetActiveLayout", C_EditMode.SetActiveLayout, layout.id)
+  local ok, err = self:SetActiveLayout(layout)
   if ok then
     result.message = "Layout UI: " .. layout.name
     table.insert(result.applied, result.message)

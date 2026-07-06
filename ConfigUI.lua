@@ -333,6 +333,7 @@ function ConfigUI:Initialize()
     self:CloseDropdown()
   end)
 
+  frame:Hide()
   self.frame = frame
 end
 
@@ -996,7 +997,14 @@ function ConfigUI:BuildUITab(parent, profile, y)
   y = self:AddSection(parent, "Layout de Edit Mode", y)
   y = self:AddDescription(parent, "Selecciona un layout de la UI de Blizzard si la API de Edit Mode esta disponible.", y)
 
-  local current = "Seleccion actual: "
+  local activeLayout = ModeShift.EditModeManager and ModeShift.EditModeManager:GetCurrentLayout() or nil
+  local activeText = "UI activa ahora: " .. (activeLayout and activeLayout.name or "desconocida")
+  local activeLabel = makeText(parent, activeText, "GameFontHighlight")
+  activeLabel:SetPoint("TOPLEFT", 4, y)
+  activeLabel:SetWidth(560)
+  y = y - 22
+
+  local current = "Este perfil aplicara: "
   if profile.editMode and profile.editMode.enabled and profile.editMode.layoutName then
     current = current .. profile.editMode.layoutName
   else
@@ -1012,6 +1020,7 @@ function ConfigUI:BuildUITab(parent, profile, y)
     profile.editMode.layoutId = nil
     profile.editMode.layoutName = nil
     self:SaveProfile(profile)
+    self:RefreshEditor()
   end)
   disabledButton:SetPoint("TOPLEFT", 4, y)
   y = y - 36
@@ -1023,12 +1032,15 @@ function ConfigUI:BuildUITab(parent, profile, y)
   end
 
   for _, layout in ipairs(layouts) do
-    local selected = profile.editMode and profile.editMode.enabled and profile.editMode.layoutName == layout.name
+    local selected = profile.editMode
+      and profile.editMode.enabled
+      and (tostring(profile.editMode.layoutId or "") == tostring(layout.id or "") or profile.editMode.layoutName == layout.name)
     local button = makeButton(parent, layout.name, 320, 24, function()
       profile.editMode.enabled = true
       profile.editMode.layoutId = layout.id
       profile.editMode.layoutName = layout.name
       self:SaveProfile(profile)
+      self:RefreshEditor()
     end)
     styleButton(button, selected)
     addHover(button, selected)

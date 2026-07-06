@@ -132,8 +132,16 @@ function ApplyEngine:ApplyProfile(profileId, options)
   self:PrintSummary(result)
 
   if result.requiresReload then
-    ModeShift.Database:SetRequiresReload(true)
-    ModeShift:ShowReloadPopup()
+    ModeShift.Database:SetRequiresReload(false)
+    ModeShift:Print("addons cambiados: recargando interfaz automaticamente...")
+    if C_Timer and C_Timer.After then
+      C_Timer.After(0.2, function()
+        ReloadUI()
+      end)
+    else
+      ReloadUI()
+    end
+    return result
   end
 
   if ModeShift.RefreshConfig then
@@ -172,7 +180,7 @@ function ApplyEngine:PrintSummary(result)
   end
 
   if result.requiresReload then
-    ModeShift:Print("|cffffff66!|r Addons modificados: requiere reload.")
+    ModeShift:Print("|cffffff66!|r Addons modificados: recarga automatica preparada.")
   end
 
   if result.success then
