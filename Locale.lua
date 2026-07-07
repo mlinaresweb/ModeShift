@@ -1,0 +1,550 @@
+local ModeShift = _G.ModeShift
+
+local Locale = {}
+
+Locale.languages = {
+  { key = "esES", label = "Español (España)" },
+  { key = "frFR", label = "Français" },
+  { key = "deDE", label = "Deutsch" },
+  { key = "enUS", label = "English" },
+  { key = "ruRU", label = "Русский" },
+  { key = "itIT", label = "Italiano" },
+  { key = "ptBR", label = "Português" },
+}
+
+local function mapClientLocale(locale)
+  locale = tostring(locale or ""):lower()
+  if locale:find("^es") then
+    return "esES"
+  elseif locale:find("^fr") then
+    return "frFR"
+  elseif locale:find("^de") then
+    return "deDE"
+  elseif locale:find("^ru") then
+    return "ruRU"
+  elseif locale:find("^it") then
+    return "itIT"
+  elseif locale:find("^pt") then
+    return "ptBR"
+  end
+  return "enUS"
+end
+
+local T = {
+  enUS = {
+    ["Perfil"] = "Profile",
+    ["Equipo"] = "Gear",
+    ["Talentos"] = "Talents",
+    ["UI"] = "UI",
+    ["Addons"] = "Addons",
+    ["Avanzado"] = "Advanced",
+    ["Ayuda"] = "Help",
+    ["Perfiles"] = "Profiles",
+    ["Nuevo"] = "New",
+    ["Duplicar"] = "Duplicate",
+    ["Eliminar"] = "Delete",
+    ["Guardar y usar"] = "Save and use",
+    ["Actualizar perfil"] = "Update profile",
+    ["Reload UI"] = "Reload UI",
+    ["No hay perfiles. Pulsa Nuevo para crear uno."] = "No profiles. Click New to create one.",
+    ["Crea o selecciona un perfil para empezar."] = "Create or select a profile to start.",
+    ["activo"] = "active",
+    ["Nombre"] = "Name",
+    ["Descripcion"] = "Description",
+    ["Guardar nombre"] = "Save name",
+    ["Aplicar ahora"] = "Apply now",
+    ["Exportar"] = "Export",
+    ["Importar"] = "Import",
+    ["Tipo de perfil"] = "Profile type",
+    ["Spec"] = "Spec",
+    ["Usar spec actual"] = "Use current spec",
+    ["Preferir para esta spec"] = "Prefer for this spec",
+    ["ID interno: "] = "Internal ID: ",
+    ["Set de equipo de Blizzard"] = "Blizzard equipment set",
+    ["Seleccion actual: "] = "Current selection: ",
+    ["no cambiar equipo"] = "do not change gear",
+    ["No cambiar equipo"] = "Do not change gear",
+    ["Crear/gestionar sets"] = "Create/manage sets",
+    ["Actualizar"] = "Refresh",
+    ["Loadout de talentos de Blizzard"] = "Blizzard talent loadout",
+    ["No cambiar talentos"] = "Do not change talents",
+    ["Aplicar automaticamente"] = "Apply automatically",
+    ["Crear/importar talentos"] = "Create/import talents",
+    ["Layout de Edit Mode de Blizzard"] = "Blizzard Edit Mode layout",
+    ["No cambiar UI"] = "Do not change UI",
+    ["Crear/gestionar UI"] = "Create/manage UI",
+    ["Addons y perfiles internos"] = "Addons and internal profiles",
+    ["Gestionar addons en este perfil"] = "Manage addons in this profile",
+    ["Actualizar desde estado actual"] = "Update from current state",
+    ["Aplicar perfiles internos de addons cuando existan"] = "Apply internal addon profiles when available",
+    ["Cargar"] = "Load",
+    ["Addon"] = "Addon",
+    ["Perfil interno"] = "Internal profile",
+    ["Disenos"] = "Layouts",
+    ["Elegir perfil"] = "Choose profile",
+    ["Disenos CDM"] = "CDM layouts",
+    ["Opciones avanzadas de consola"] = "Advanced console options",
+    ["Ayuda de ModeShift"] = "ModeShift help",
+    ["Menu rapido"] = "Quick menu",
+    ["Opciones de AddOns"] = "Addon options",
+    ["Comandos"] = "Commands",
+    ["Flujo recomendado"] = "Recommended flow",
+    ["Cooldown Manager / CDS"] = "Cooldown Manager / CDS",
+    ["Idioma"] = "Language",
+    ["Seleccion"] = "Selection",
+    ["Limpiar seleccion"] = "Clear selection",
+    ["No he encontrado disenos"] = "No layouts found",
+    ["No he encontrado configs"] = "No configs found",
+    ["Config..."] = "Config...",
+    ["Actual: "] = "Current: ",
+    ["Diseno actual: "] = "Current layout: ",
+    ["Click izquierdo: configuracion"] = "Left click: configuration",
+    ["Click derecho: cambio rapido"] = "Right click: quick switch",
+    ["Arrastrar: mover alrededor del minimapa"] = "Drag: move around the minimap",
+    ["Click: configuracion"] = "Click: configuration",
+    ["Click derecho: menu rapido"] = "Right click: quick menu",
+    ["Reaplicar perfil actual"] = "Reapply current profile",
+    ["Abrir configuracion"] = "Open configuration",
+    ["Aplicar perfil pendiente"] = "Apply pending profile",
+    ["Recargar interfaz"] = "Reload interface",
+    ["Gestiona perfiles de spec, equipo, talentos, UI, addons, perfiles internos de addons y CVars."] = "Manage profiles for spec, gear, talents, UI, addons, internal addon profiles and CVars.",
+    ["Abrir ModeShift"] = "Open ModeShift",
+    ["Comandos principales"] = "Main commands",
+    ["Datos del perfil"] = "Profile data",
+    ["Perfil activo en menus"] = "Profile active in menus",
+    ["Selecciona un set por nombre. ModeShift guardara el nombre y el ID si Blizzard lo expone."] = "Select a set by name. ModeShift stores the name and ID when Blizzard exposes it.",
+    ["No encuentro sets de equipo. Crea sets desde el gestor de equipo de Blizzard y vuelve a abrir esta pestana."] = "No gear sets found. Create sets in Blizzard's equipment manager and reopen this tab.",
+    ["Abrir talentos"] = "Open talents",
+    ["No encuentro loadouts de talentos para la spec actual o la API no esta disponible."] = "No talent loadouts found for the current spec or the API is unavailable.",
+    ["Layout de Edit Mode"] = "Edit Mode layout",
+    ["Selecciona un layout de la UI de Blizzard si la API de Edit Mode esta disponible."] = "Select a Blizzard UI layout when the Edit Mode API is available.",
+    ["No cambiar layout"] = "Do not change layout",
+    ["Abrir modo edicion"] = "Open edit mode",
+    ["No encuentro layouts de Edit Mode. Puedes seguir usando equipo, talentos, addons y CVars sin problema."] = "No Edit Mode layouts found. You can still use gear, talents, addons and CVars.",
+    ["Marca los addons que deben cargarse en este perfil. Los no marcados se desactivaran al aplicar el perfil. Si hay perfiles internos, puedes elegirlos a la derecha."] = "Mark the addons that should load in this profile. Unchecked addons are disabled when applying it. Internal profiles can be selected on the right.",
+    ["Estado inicial capturado automaticamente al crear el perfil."] = "Initial state captured automatically when the profile was created.",
+    ["No encuentro la lista de addons instalados."] = "Installed addon list not found.",
+    ["CVars son variables internas de configuracion de WoW. No las necesitas salvo que sepas exactamente que ajuste quieres guardar."] = "CVars are internal WoW configuration variables. Use them only if you know exactly what setting you want to save.",
+    ["Aplicar variables de consola en este perfil"] = "Apply console variables in this profile",
+    ["Anadir ajuste"] = "Add setting",
+    ["Quitar"] = "Remove",
+    ["No hay variables de consola configuradas."] = "No console variables configured.",
+    ["Copiar todo"] = "Copy all",
+    ["Pegar"] = "Paste",
+    ["Cerrar"] = "Close",
+  },
+  frFR = {
+    ["Perfil"] = "Profil", ["Equipo"] = "Équipement", ["Talentos"] = "Talents", ["UI"] = "Interface", ["Addons"] = "Addons", ["Avanzado"] = "Avancé", ["Ayuda"] = "Aide", ["Perfiles"] = "Profils",
+    ["Nuevo"] = "Nouveau", ["Duplicar"] = "Dupliquer", ["Eliminar"] = "Supprimer", ["Guardar y usar"] = "Enregistrer et utiliser", ["Actualizar perfil"] = "Mettre à jour", ["Reload UI"] = "Recharger l'UI",
+    ["Idioma"] = "Langue", ["Menu rapido"] = "Menu rapide", ["Opciones de AddOns"] = "Options des addons", ["Comandos"] = "Commandes", ["Flujo recomendado"] = "Flux recommandé",
+    ["Guardar nombre"] = "Enregistrer le nom", ["Aplicar ahora"] = "Appliquer maintenant", ["Exportar"] = "Exporter", ["Importar"] = "Importer", ["Tipo de perfil"] = "Type de profil", ["Spec"] = "Spé",
+    ["Usar spec actual"] = "Utiliser la spé actuelle", ["Preferir para esta spec"] = "Préférer pour cette spé", ["No cambiar equipo"] = "Ne pas changer l'équipement", ["Crear/gestionar sets"] = "Créer/gérer les sets",
+    ["No cambiar talentos"] = "Ne pas changer les talents", ["Aplicar automaticamente"] = "Appliquer automatiquement", ["Crear/importar talentos"] = "Créer/importer talents", ["No cambiar UI"] = "Ne pas changer l'interface",
+    ["Crear/gestionar UI"] = "Créer/gérer l'interface", ["Addons y perfiles internos"] = "Addons et profils internes", ["Gestionar addons en este perfil"] = "Gérer les addons dans ce profil",
+    ["Actualizar desde estado actual"] = "Mettre à jour depuis l'état actuel", ["Aplicar perfiles internos de addons cuando existan"] = "Appliquer les profils internes si disponibles",
+    ["Cargar"] = "Charger", ["Addon"] = "Addon", ["Perfil interno"] = "Profil interne", ["Disenos"] = "Modèles", ["Elegir perfil"] = "Choisir un profil", ["Disenos CDM"] = "Modèles CDM",
+    ["Ayuda de ModeShift"] = "Aide de ModeShift", ["Cooldown Manager / CDS"] = "Cooldown Manager / CDS", ["Limpiar seleccion"] = "Effacer la sélection",
+    ["activo"] = "actif", ["Reaplicar perfil actual"] = "Réappliquer le profil actuel", ["Abrir configuracion"] = "Ouvrir la configuration", ["Aplicar perfil pendiente"] = "Appliquer le profil en attente", ["Recargar interfaz"] = "Recharger l'interface",
+    ["Gestiona perfiles de spec, equipo, talentos, UI, addons, perfiles internos de addons y CVars."] = "Gère les profils de spé, équipement, talents, interface, addons, profils internes d'addons et CVars.", ["Abrir ModeShift"] = "Ouvrir ModeShift", ["Comandos principales"] = "Commandes principales",
+  },
+  deDE = {
+    ["Perfil"] = "Profil", ["Equipo"] = "Ausrüstung", ["Talentos"] = "Talente", ["UI"] = "UI", ["Addons"] = "Addons", ["Avanzado"] = "Erweitert", ["Ayuda"] = "Hilfe", ["Perfiles"] = "Profile",
+    ["Nuevo"] = "Neu", ["Duplicar"] = "Duplizieren", ["Eliminar"] = "Löschen", ["Guardar y usar"] = "Speichern und nutzen", ["Actualizar perfil"] = "Profil aktualisieren", ["Reload UI"] = "UI neu laden",
+    ["Idioma"] = "Sprache", ["Menu rapido"] = "Schnellmenü", ["Opciones de AddOns"] = "Addon-Optionen", ["Comandos"] = "Befehle", ["Flujo recomendado"] = "Empfohlener Ablauf",
+    ["Guardar nombre"] = "Namen speichern", ["Aplicar ahora"] = "Jetzt anwenden", ["Exportar"] = "Exportieren", ["Importar"] = "Importieren", ["Tipo de perfil"] = "Profiltyp", ["Spec"] = "Spezialisierung",
+    ["Usar spec actual"] = "Aktuelle Spezialisierung", ["Preferir para esta spec"] = "Für diese Spez. bevorzugen", ["No cambiar equipo"] = "Ausrüstung nicht ändern", ["Crear/gestionar sets"] = "Sets erstellen/verwalten",
+    ["No cambiar talentos"] = "Talente nicht ändern", ["Aplicar automaticamente"] = "Automatisch anwenden", ["Crear/importar talentos"] = "Talente erstellen/importieren", ["No cambiar UI"] = "UI nicht ändern",
+    ["Crear/gestionar UI"] = "UI erstellen/verwalten", ["Addons y perfiles internos"] = "Addons und interne Profile", ["Gestionar addons en este perfil"] = "Addons in diesem Profil verwalten",
+    ["Actualizar desde estado actual"] = "Aus aktuellem Zustand aktualisieren", ["Aplicar perfiles internos de addons cuando existan"] = "Interne Addon-Profile anwenden, wenn vorhanden",
+    ["Cargar"] = "Laden", ["Addon"] = "Addon", ["Perfil interno"] = "Internes Profil", ["Disenos"] = "Layouts", ["Elegir perfil"] = "Profil wählen", ["Disenos CDM"] = "CDM-Layouts",
+    ["Ayuda de ModeShift"] = "ModeShift-Hilfe", ["Cooldown Manager / CDS"] = "Cooldown Manager / CDS", ["Limpiar seleccion"] = "Auswahl löschen",
+    ["activo"] = "aktiv", ["Reaplicar perfil actual"] = "Aktuelles Profil erneut anwenden", ["Abrir configuracion"] = "Konfiguration öffnen", ["Aplicar perfil pendiente"] = "Ausstehendes Profil anwenden", ["Recargar interfaz"] = "Interface neu laden",
+    ["Gestiona perfiles de spec, equipo, talentos, UI, addons, perfiles internos de addons y CVars."] = "Verwaltet Profile für Spezialisierung, Ausrüstung, Talente, UI, Addons, interne Addon-Profile und CVars.", ["Abrir ModeShift"] = "ModeShift öffnen", ["Comandos principales"] = "Hauptbefehle",
+  },
+  ruRU = {
+    ["Perfil"] = "Профиль", ["Equipo"] = "Экипировка", ["Talentos"] = "Таланты", ["UI"] = "Интерфейс", ["Addons"] = "Аддоны", ["Avanzado"] = "Дополнительно", ["Ayuda"] = "Помощь", ["Perfiles"] = "Профили",
+    ["Nuevo"] = "Новый", ["Duplicar"] = "Дублировать", ["Eliminar"] = "Удалить", ["Guardar y usar"] = "Сохранить и использовать", ["Actualizar perfil"] = "Обновить профиль", ["Reload UI"] = "Перезагрузить UI",
+    ["Idioma"] = "Язык", ["Menu rapido"] = "Быстрое меню", ["Opciones de AddOns"] = "Настройки аддонов", ["Comandos"] = "Команды", ["Flujo recomendado"] = "Рекомендуемый порядок",
+    ["Guardar nombre"] = "Сохранить имя", ["Aplicar ahora"] = "Применить сейчас", ["Exportar"] = "Экспорт", ["Importar"] = "Импорт", ["Tipo de perfil"] = "Тип профиля", ["Spec"] = "Спек",
+    ["Usar spec actual"] = "Использовать текущий спек", ["Preferir para esta spec"] = "Предпочитать для спека", ["No cambiar equipo"] = "Не менять экипировку", ["Crear/gestionar sets"] = "Создать/управлять сетами",
+    ["No cambiar talentos"] = "Не менять таланты", ["Aplicar automaticamente"] = "Применять автоматически", ["Crear/importar talentos"] = "Создать/импортировать таланты", ["No cambiar UI"] = "Не менять UI",
+    ["Crear/gestionar UI"] = "Создать/управлять UI", ["Addons y perfiles internos"] = "Аддоны и внутренние профили", ["Gestionar addons en este perfil"] = "Управлять аддонами в профиле",
+    ["Actualizar desde estado actual"] = "Обновить из текущего состояния", ["Aplicar perfiles internos de addons cuando existan"] = "Применять внутренние профили аддонов, если есть",
+    ["Cargar"] = "Загрузка", ["Addon"] = "Аддон", ["Perfil interno"] = "Внутренний профиль", ["Disenos"] = "Макеты", ["Elegir perfil"] = "Выбрать профиль", ["Disenos CDM"] = "Макеты CDM",
+    ["Ayuda de ModeShift"] = "Помощь ModeShift", ["Cooldown Manager / CDS"] = "Cooldown Manager / CDS", ["Limpiar seleccion"] = "Очистить выбор",
+    ["activo"] = "активен", ["Reaplicar perfil actual"] = "Повторно применить текущий профиль", ["Abrir configuracion"] = "Открыть настройки", ["Aplicar perfil pendiente"] = "Применить ожидающий профиль", ["Recargar interfaz"] = "Перезагрузить интерфейс",
+    ["Gestiona perfiles de spec, equipo, talentos, UI, addons, perfiles internos de addons y CVars."] = "Управляет профилями спека, экипировки, талантов, интерфейса, аддонов, внутренних профилей аддонов и CVars.", ["Abrir ModeShift"] = "Открыть ModeShift", ["Comandos principales"] = "Основные команды",
+  },
+  itIT = {
+    ["Perfil"] = "Profilo", ["Equipo"] = "Equipaggiamento", ["Talentos"] = "Talenti", ["UI"] = "Interfaccia", ["Addons"] = "Addon", ["Avanzado"] = "Avanzato", ["Ayuda"] = "Aiuto", ["Perfiles"] = "Profili",
+    ["Nuevo"] = "Nuovo", ["Duplicar"] = "Duplica", ["Eliminar"] = "Elimina", ["Guardar y usar"] = "Salva e usa", ["Actualizar perfil"] = "Aggiorna profilo", ["Reload UI"] = "Ricarica UI",
+    ["Idioma"] = "Lingua", ["Menu rapido"] = "Menu rapido", ["Opciones de AddOns"] = "Opzioni addon", ["Comandos"] = "Comandi", ["Flujo recomendado"] = "Flusso consigliato",
+    ["Guardar nombre"] = "Salva nome", ["Aplicar ahora"] = "Applica ora", ["Exportar"] = "Esporta", ["Importar"] = "Importa", ["Tipo de perfil"] = "Tipo profilo", ["Spec"] = "Specializzazione",
+    ["Usar spec actual"] = "Usa spec attuale", ["Preferir para esta spec"] = "Preferisci per questa spec", ["No cambiar equipo"] = "Non cambiare equipaggiamento", ["Crear/gestionar sets"] = "Crea/gestisci set",
+    ["No cambiar talentos"] = "Non cambiare talenti", ["Aplicar automaticamente"] = "Applica automaticamente", ["Crear/importar talentos"] = "Crea/importa talenti", ["No cambiar UI"] = "Non cambiare UI",
+    ["Crear/gestionar UI"] = "Crea/gestisci UI", ["Addons y perfiles internos"] = "Addon e profili interni", ["Gestionar addons en este perfil"] = "Gestisci addon in questo profilo",
+    ["Actualizar desde estado actual"] = "Aggiorna dallo stato attuale", ["Aplicar perfiles internos de addons cuando existan"] = "Applica profili interni quando disponibili",
+    ["Cargar"] = "Carica", ["Addon"] = "Addon", ["Perfil interno"] = "Profilo interno", ["Disenos"] = "Layout", ["Elegir perfil"] = "Scegli profilo", ["Disenos CDM"] = "Layout CDM",
+    ["Ayuda de ModeShift"] = "Aiuto di ModeShift", ["Cooldown Manager / CDS"] = "Cooldown Manager / CDS", ["Limpiar seleccion"] = "Pulisci selezione",
+    ["activo"] = "attivo", ["Reaplicar perfil actual"] = "Riapplica profilo attuale", ["Abrir configuracion"] = "Apri configurazione", ["Aplicar perfil pendiente"] = "Applica profilo in sospeso", ["Recargar interfaz"] = "Ricarica interfaccia",
+    ["Gestiona perfiles de spec, equipo, talentos, UI, addons, perfiles internos de addons y CVars."] = "Gestisce profili di specializzazione, equipaggiamento, talenti, UI, addon, profili interni degli addon e CVar.", ["Abrir ModeShift"] = "Apri ModeShift", ["Comandos principales"] = "Comandi principali",
+  },
+  ptBR = {
+    ["Perfil"] = "Perfil", ["Equipo"] = "Equipamento", ["Talentos"] = "Talentos", ["UI"] = "Interface", ["Addons"] = "Addons", ["Avanzado"] = "Avançado", ["Ayuda"] = "Ajuda", ["Perfiles"] = "Perfis",
+    ["Nuevo"] = "Novo", ["Duplicar"] = "Duplicar", ["Eliminar"] = "Excluir", ["Guardar y usar"] = "Salvar e usar", ["Actualizar perfil"] = "Atualizar perfil", ["Reload UI"] = "Recarregar UI",
+    ["Idioma"] = "Idioma", ["Menu rapido"] = "Menu rápido", ["Opciones de AddOns"] = "Opções de addons", ["Comandos"] = "Comandos", ["Flujo recomendado"] = "Fluxo recomendado",
+    ["Guardar nombre"] = "Salvar nome", ["Aplicar ahora"] = "Aplicar agora", ["Exportar"] = "Exportar", ["Importar"] = "Importar", ["Tipo de perfil"] = "Tipo de perfil", ["Spec"] = "Especialização",
+    ["Usar spec actual"] = "Usar especialização atual", ["Preferir para esta spec"] = "Preferir para esta spec", ["No cambiar equipo"] = "Não alterar equipamento", ["Crear/gestionar sets"] = "Criar/gerenciar conjuntos",
+    ["No cambiar talentos"] = "Não alterar talentos", ["Aplicar automaticamente"] = "Aplicar automaticamente", ["Crear/importar talentos"] = "Criar/importar talentos", ["No cambiar UI"] = "Não alterar interface",
+    ["Crear/gestionar UI"] = "Criar/gerenciar interface", ["Addons y perfiles internos"] = "Addons e perfis internos", ["Gestionar addons en este perfil"] = "Gerenciar addons neste perfil",
+    ["Actualizar desde estado actual"] = "Atualizar do estado atual", ["Aplicar perfiles internos de addons cuando existan"] = "Aplicar perfis internos quando existirem",
+    ["Cargar"] = "Carregar", ["Addon"] = "Addon", ["Perfil interno"] = "Perfil interno", ["Disenos"] = "Layouts", ["Elegir perfil"] = "Escolher perfil", ["Disenos CDM"] = "Layouts CDM",
+    ["Ayuda de ModeShift"] = "Ajuda do ModeShift", ["Cooldown Manager / CDS"] = "Cooldown Manager / CDS", ["Limpiar seleccion"] = "Limpar seleção",
+    ["activo"] = "ativo", ["Reaplicar perfil actual"] = "Reaplicar perfil atual", ["Abrir configuracion"] = "Abrir configuração", ["Aplicar perfil pendiente"] = "Aplicar perfil pendente", ["Recargar interfaz"] = "Recarregar interface",
+    ["Gestiona perfiles de spec, equipo, talentos, UI, addons, perfiles internos de addons y CVars."] = "Gerencia perfis de especialização, equipamento, talentos, interface, addons, perfis internos de addons e CVars.", ["Abrir ModeShift"] = "Abrir ModeShift", ["Comandos principales"] = "Comandos principais",
+  },
+}
+
+local EXTRA = {
+  esES = {
+    ["Perfil"] = "Perfil",
+    ["Equipo"] = "Equipo",
+    ["Talentos"] = "Talentos",
+    ["UI"] = "UI",
+    ["Addons"] = "Addons",
+    ["Avanzado"] = "Avanzado",
+    ["Ayuda"] = "Ayuda",
+    ["Perfiles"] = "Perfiles",
+    ["Nuevo"] = "Nuevo",
+    ["Duplicar"] = "Duplicar",
+    ["Eliminar"] = "Eliminar",
+    ["Guardar y usar"] = "Guardar y usar",
+    ["Actualizar perfil"] = "Actualizar perfil",
+    ["Reload UI"] = "Recargar UI",
+    ["Idioma"] = "Idioma",
+    ["No hay perfiles. Pulsa Nuevo para crear uno."] = "No hay perfiles. Pulsa Nuevo para crear uno.",
+    ["Crea o selecciona un perfil para empezar."] = "Crea o selecciona un perfil para empezar.",
+    ["activo"] = "activo",
+    ["Nombre"] = "Nombre",
+    ["Descripcion"] = "Descripción",
+    ["Guardar nombre"] = "Guardar nombre",
+    ["Aplicar ahora"] = "Aplicar ahora",
+    ["Exportar"] = "Exportar",
+    ["Importar"] = "Importar",
+    ["Exportar perfil"] = "Exportar perfil",
+    ["Importar perfil"] = "Importar perfil",
+    ["Tipo de perfil"] = "Tipo de perfil",
+    ["Spec"] = "Spec",
+    ["Datos del perfil"] = "Datos del perfil",
+    ["Perfil activo en menus"] = "Perfil activo en menús",
+    ["Usar spec actual"] = "Usar spec actual",
+    ["Preferir para esta spec"] = "Preferir para esta spec",
+    ["Asignada: %s"] = "Asignada: %s",
+    ["ID interno: %s"] = "ID interno: %s",
+    ["ninguna"] = "ninguna",
+    ["ninguno"] = "ninguno",
+    ["desconocidos"] = "desconocidos",
+    ["desconocida"] = "desconocida",
+    ["sin spec"] = "sin spec",
+    ["Set de equipo de Blizzard"] = "Set de equipo de Blizzard",
+    ["Selecciona un set por nombre. ModeShift guardara el nombre y el ID si Blizzard lo expone."] = "Selecciona un set por nombre. ModeShift guardará el nombre y el ID si Blizzard lo expone.",
+    ["Seleccion actual: %s"] = "Selección actual: %s",
+    ["no cambiar equipo"] = "no cambiar equipo",
+    ["No cambiar equipo"] = "No cambiar equipo",
+    ["Crear/gestionar sets"] = "Crear/gestionar sets",
+    ["Actualizar"] = "Actualizar",
+    ["No encuentro sets de equipo. Crea sets desde el gestor de equipo de Blizzard y vuelve a abrir esta pestana."] = "No encuentro sets de equipo. Crea sets desde el gestor de equipo de Blizzard y vuelve a abrir esta pestaña.",
+    ["Loadout de talentos de Blizzard"] = "Configuración de talentos de Blizzard",
+    ["Selecciona una configuracion de talentos de la spec actual. Si el perfil pertenece a otra spec, cambia de spec antes de elegir."] = "Selecciona una configuración de talentos de la spec actual. Si el perfil pertenece a otra spec, cambia de spec antes de elegir.",
+    ["Talentos activos ahora: %s"] = "Talentos activos ahora: %s",
+    ["Este perfil aplicara: %s"] = "Este perfil aplicará: %s",
+    ["no cambiar talentos"] = "no cambiar talentos",
+    ["No cambiar talentos"] = "No cambiar talentos",
+    ["Aplicar automaticamente"] = "Aplicar automáticamente",
+    ["Abrir talentos"] = "Abrir talentos",
+    ["Crear/importar talentos"] = "Crear/importar talentos",
+    ["No encuentro loadouts de talentos para la spec actual o la API no esta disponible."] = "No encuentro configuraciones de talentos para la spec actual o la API no está disponible.",
+    ["Layout de Edit Mode"] = "Diseño del modo edición",
+    ["Layout de Edit Mode de Blizzard"] = "Diseño del modo edición de Blizzard",
+    ["Selecciona un layout de la UI de Blizzard si la API de Edit Mode esta disponible."] = "Selecciona un diseño de la UI de Blizzard si la API del modo edición está disponible.",
+    ["UI activa ahora: %s"] = "UI activa ahora: %s",
+    ["no cambiar layout"] = "no cambiar diseño",
+    ["No cambiar layout"] = "No cambiar diseño",
+    ["No cambiar UI"] = "No cambiar UI",
+    ["Abrir modo edicion"] = "Abrir modo edición",
+    ["Crear/gestionar UI"] = "Crear/gestionar UI",
+    ["No encuentro layouts de Edit Mode. Puedes seguir usando equipo, talentos, addons y CVars sin problema."] = "No encuentro diseños del modo edición. Puedes seguir usando equipo, talentos, addons y CVars sin problema.",
+    ["Addons y perfiles internos"] = "Addons y perfiles internos",
+    ["Marca los addons que deben cargarse en este perfil. Los no marcados se desactivaran al aplicar el perfil. Si hay perfiles internos, puedes elegirlos a la derecha."] = "Marca los addons que deben cargarse en este perfil. Los no marcados se desactivarán al aplicar el perfil. Si hay perfiles internos, puedes elegirlos a la derecha.",
+    ["Gestionar addons en este perfil"] = "Gestionar addons en este perfil",
+    ["Estado inicial capturado automaticamente al crear el perfil."] = "Estado inicial capturado automáticamente al crear el perfil.",
+    ["Actualizar desde estado actual"] = "Actualizar desde estado actual",
+    ["Aplicar perfiles internos de addons cuando existan"] = "Aplicar perfiles internos de addons cuando existan",
+    ["Cargar"] = "Cargar",
+    ["Addon"] = "Addon",
+    ["Perfil interno"] = "Perfil interno",
+    ["Disenos"] = "Diseños",
+    ["cargado/activo"] = "cargado/activo",
+    ["desactivado"] = "desactivado",
+    ["%s - %s"] = "%s - %s",
+    ["Elegir perfil"] = "Elegir perfil",
+    ["Actual: %s"] = "Actual: %s",
+    ["Diseno actual: %s"] = "Diseño actual: %s",
+    ["No he encontrado perfiles"] = "No he encontrado perfiles",
+    ["No he encontrado disenos"] = "No he encontrado diseños",
+    ["No he encontrado configs"] = "No he encontrado configs",
+    ["Limpiar seleccion"] = "Limpiar selección",
+    ["Disenos CDM"] = "Diseños CDM",
+    ["Config..."] = "Config...",
+    ["%s disenos"] = "%s diseños",
+    ["%s config"] = "%s config",
+    ["Opciones avanzadas de consola"] = "Opciones avanzadas de consola",
+    ["CVars son variables internas de configuracion de WoW. No las necesitas salvo que sepas exactamente que ajuste quieres guardar."] = "Las CVars son variables internas de configuración de WoW. No las necesitas salvo que sepas exactamente qué ajuste quieres guardar.",
+    ["Aplicar variables de consola en este perfil"] = "Aplicar variables de consola en este perfil",
+    ["Anadir ajuste"] = "Añadir ajuste",
+    ["Quitar"] = "Quitar",
+    ["No hay variables de consola configuradas."] = "No hay variables de consola configuradas.",
+    ["Ayuda de ModeShift"] = "Ayuda de ModeShift",
+    ["Perfil seleccionado: %s"] = "Perfil seleccionado: %s",
+    ["Menu rapido"] = "Menú rápido",
+    ["Opciones de AddOns"] = "Opciones de AddOns",
+    ["Comandos"] = "Comandos",
+    ["Flujo recomendado"] = "Flujo recomendado",
+    ["Cooldown Manager / CDS"] = "Cooldown Manager / CDS",
+    ["Copiar todo"] = "Copiar todo",
+    ["Pegar"] = "Pegar",
+    ["Cerrar"] = "Cerrar",
+    ["No hay perfiles creados"] = "No hay perfiles creados",
+    ["%s (actual)"] = "%s (actual)",
+  },
+  enUS = {
+    ["Exportar perfil"] = "Export profile",
+    ["Importar perfil"] = "Import profile",
+    ["Asignada: %s"] = "Assigned: %s",
+    ["ID interno: %s"] = "Internal ID: %s",
+    ["ninguna"] = "none",
+    ["ninguno"] = "none",
+    ["desconocidos"] = "unknown",
+    ["desconocida"] = "unknown",
+    ["sin spec"] = "no spec",
+    ["Seleccion actual: %s"] = "Current selection: %s",
+    ["Talentos activos ahora: %s"] = "Active talents now: %s",
+    ["Este perfil aplicara: %s"] = "This profile will apply: %s",
+    ["no cambiar talentos"] = "do not change talents",
+    ["UI activa ahora: %s"] = "Active UI now: %s",
+    ["no cambiar layout"] = "do not change layout",
+    ["cargado/activo"] = "loaded/active",
+    ["desactivado"] = "disabled",
+    ["%s - %s"] = "%s - %s",
+    ["Actual: %s"] = "Current: %s",
+    ["Diseno actual: %s"] = "Current layout: %s",
+    ["No he encontrado perfiles"] = "No profiles found",
+    ["%s disenos"] = "%s layouts",
+    ["%s config"] = "%s config",
+    ["Perfil seleccionado: %s"] = "Selected profile: %s",
+    ["No hay perfiles creados"] = "No profiles created",
+    ["%s (actual)"] = "%s (current)",
+    ["Abrir o cerrar la configuracion"] = "Open or close configuration",
+    ["Mostrar el menu rapido en el chat"] = "Show the quick menu in chat",
+    ["Listar perfiles disponibles"] = "List available profiles",
+    ["Ver el perfil activo"] = "Show active profile",
+    ["Aplicar un perfil por ID interno"] = "Apply a profile by internal ID",
+    ["Reaplicar el perfil activo"] = "Reapply the active profile",
+    ["Crear perfiles de ejemplo para la spec actual"] = "Create example profiles for the current spec",
+    ["Asignar set de equipo por nombre"] = "Assign a gear set by name",
+    ["Asignar loadout de talentos por nombre"] = "Assign a talent loadout by name",
+    ["Forzar addon activo o desactivado en un perfil"] = "Force an addon on or off in a profile",
+    ["Listar addons instalados"] = "List installed addons",
+    ["Mostrar diagnostico rapido"] = "Show quick diagnostics",
+    ["Recargar interfaz cuando haya cambios de addons"] = "Reload the interface after addon changes",
+    ["Activar o desactivar mensajes de debug"] = "Toggle debug messages",
+    ["Nuevo crea un perfil desde tu estado actual."] = "New creates a profile from your current state.",
+    ["Guardar y usar guarda el estado actual y marca ese perfil como actual."] = "Save and use stores the current state and marks that profile as current.",
+    ["Actualizar perfil guarda el estado actual en el perfil seleccionado sin aplicarlo."] = "Update profile stores the current state in the selected profile without applying it.",
+    ["Si cambias addons, ModeShift pedira reload cuando sea necesario."] = "If you change addons, ModeShift will ask for reload when needed.",
+    ["El menu del minimapa permite aplicar perfiles por spec y tipo."] = "The minimap menu can apply profiles by spec and type.",
+    ["En la pestana Addons, CooldownManagerCentered permite elegir el perfil interno y el diseno CDM."] = "In the Addons tab, CooldownManagerCentered lets you choose its internal profile and CDM layout.",
+    ["ModeShift guarda por perfil los trackers de CDM/CDS, su posicion, tamano, direccion y estilo."] = "ModeShift stores CDM/CDS trackers per profile, including position, size, direction and style.",
+    ["Los trackers se colocan desde el modo edicion de Blizzard/CDM: abre /cdm o /cds, entra en modo edicion y mueve los trackers en pantalla."] = "Trackers are positioned from Blizzard/CDM edit mode: open /cdm or /cds, enter edit mode and move them on screen.",
+    ["Despues de mover trackers o cambiar su tamano/direccion, vuelve a ModeShift y pulsa Actualizar perfil para guardar esa colocacion."] = "After moving trackers or changing size/direction, return to ModeShift and press Update profile to save that placement.",
+    ["Tambien guarda por perfil la colocacion de Hechizos y Beneficios: esenciales, utilidad, iconos, barras y no mostrados."] = "It also stores spell and buff placement per profile: essentials, utility, icons, bars and hidden items.",
+    ["Hechizos y Beneficios se organizan dentro de /cdm o /cds arrastrandolos entre secciones; ModeShift captura esa organizacion por perfil."] = "Spells and buffs are organized inside /cdm or /cds by dragging them between sections; ModeShift captures that organization per profile.",
+    ["La captura usa IDs y claves internas del addon, asi que funciona igual aunque el juego este en otro idioma."] = "Capture uses IDs and internal addon keys, so it works regardless of game language.",
+    ["Si cambias algo dentro de /cdm o /cds, vuelve a ModeShift y pulsa Actualizar perfil para guardar ese estado en el perfil seleccionado."] = "If you change something inside /cdm or /cds, return to ModeShift and press Update profile to save that state into the selected profile.",
+    ["Guardar y usar guarda el estado actual de CDM/CDS y aplica ese perfil de ModeShift como perfil activo."] = "Save and use stores the current CDM/CDS state and applies that ModeShift profile as active.",
+    ["/ms config - abrir configuracion"] = "/ms config - open configuration",
+    ["/ms quick - menu rapido"] = "/ms quick - quick menu",
+    ["/ms current - perfil actual"] = "/ms current - current profile",
+    ["/ms reload - recargar interfaz"] = "/ms reload - reload interface",
+    ["/ms doctor - diagnostico rapido"] = "/ms doctor - quick diagnostics",
+    ["No hay perfiles todavia. Usa /ms create para crear ejemplos para la spec actual."] = "No profiles yet. Use /ms create to create examples for the current spec.",
+  },
+  frFR = {
+    ["Nombre"] = "Nom", ["Descripcion"] = "Description", ["Datos del perfil"] = "Données du profil", ["Perfil activo en menus"] = "Profil visible dans les menus",
+    ["Exportar perfil"] = "Exporter le profil", ["Importar perfil"] = "Importer le profil", ["Asignada: %s"] = "Assignée : %s", ["ID interno: %s"] = "ID interne : %s",
+    ["ninguna"] = "aucune", ["ninguno"] = "aucun", ["desconocidos"] = "inconnus", ["desconocida"] = "inconnue", ["sin spec"] = "sans spé",
+    ["Set de equipo de Blizzard"] = "Ensemble d'équipement Blizzard", ["Selecciona un set por nombre. ModeShift guardara el nombre y el ID si Blizzard lo expone."] = "Sélectionne un ensemble par nom. ModeShift garde le nom et l'ID si Blizzard l'expose.",
+    ["Seleccion actual: %s"] = "Sélection actuelle : %s", ["no cambiar equipo"] = "ne pas changer l'équipement", ["No encuentro sets de equipo. Crea sets desde el gestor de equipo de Blizzard y vuelve a abrir esta pestana."] = "Aucun ensemble trouvé. Crée des ensembles dans le gestionnaire d'équipement Blizzard puis rouvre cet onglet.",
+    ["Loadout de talentos de Blizzard"] = "Configuration de talents Blizzard", ["Selecciona una configuracion de talentos de la spec actual. Si el perfil pertenece a otra spec, cambia de spec antes de elegir."] = "Sélectionne une configuration de talents de la spé actuelle. Si le profil appartient à une autre spé, change de spé avant de choisir.",
+    ["Talentos activos ahora: %s"] = "Talents actifs maintenant : %s", ["Este perfil aplicara: %s"] = "Ce profil appliquera : %s", ["no cambiar talentos"] = "ne pas changer les talents", ["Abrir talentos"] = "Ouvrir les talents", ["Actualizar"] = "Actualiser",
+    ["No encuentro loadouts de talentos para la spec actual o la API no esta disponible."] = "Aucune configuration de talents trouvée pour la spé actuelle ou l'API n'est pas disponible.",
+    ["Layout de Edit Mode"] = "Disposition du mode édition", ["Layout de Edit Mode de Blizzard"] = "Disposition du mode édition Blizzard", ["Selecciona un layout de la UI de Blizzard si la API de Edit Mode esta disponible."] = "Sélectionne une disposition de l'interface Blizzard si l'API du mode édition est disponible.",
+    ["UI activa ahora: %s"] = "Interface active maintenant : %s", ["no cambiar layout"] = "ne pas changer la disposition", ["No cambiar layout"] = "Ne pas changer la disposition", ["Abrir modo edicion"] = "Ouvrir le mode édition",
+    ["No encuentro layouts de Edit Mode. Puedes seguir usando equipo, talentos, addons y CVars sin problema."] = "Aucune disposition du mode édition trouvée. Tu peux quand même utiliser l'équipement, les talents, les addons et les CVars.",
+    ["Marca los addons que deben cargarse en este perfil. Los no marcados se desactivaran al aplicar el perfil. Si hay perfiles internos, puedes elegirlos a la derecha."] = "Coche les addons à charger dans ce profil. Les addons non cochés seront désactivés à l'application. Les profils internes se choisissent à droite.",
+    ["Estado inicial capturado automaticamente al crear el perfil."] = "État initial capturé automatiquement à la création du profil.", ["cargado/activo"] = "chargé/actif", ["desactivado"] = "désactivé", ["%s - %s"] = "%s - %s",
+    ["Actual: %s"] = "Actuel : %s", ["Diseno actual: %s"] = "Modèle actuel : %s", ["No he encontrado perfiles"] = "Aucun profil trouvé", ["No he encontrado disenos"] = "Aucun modèle trouvé", ["No he encontrado configs"] = "Aucune config trouvée", ["%s disenos"] = "Modèles %s", ["%s config"] = "Config %s",
+    ["Opciones avanzadas de consola"] = "Options avancées de console", ["CVars son variables internas de configuracion de WoW. No las necesitas salvo que sepas exactamente que ajuste quieres guardar."] = "Les CVars sont des variables internes de WoW. Utilise-les seulement si tu sais exactement quel réglage garder.",
+    ["Aplicar variables de consola en este perfil"] = "Appliquer les variables de console dans ce profil", ["Anadir ajuste"] = "Ajouter", ["Quitar"] = "Retirer", ["No hay variables de consola configuradas."] = "Aucune variable de console configurée.",
+    ["Perfil seleccionado: %s"] = "Profil sélectionné : %s", ["Copiar todo"] = "Tout copier", ["Pegar"] = "Coller", ["Cerrar"] = "Fermer", ["No hay perfiles creados"] = "Aucun profil créé", ["%s (actual)"] = "%s (actuel)",
+  },
+  deDE = {
+    ["Nombre"] = "Name", ["Descripcion"] = "Beschreibung", ["Datos del perfil"] = "Profildaten", ["Perfil activo en menus"] = "Profil in Menüs sichtbar", ["Exportar perfil"] = "Profil exportieren", ["Importar perfil"] = "Profil importieren",
+    ["Asignada: %s"] = "Zugewiesen: %s", ["ID interno: %s"] = "Interne ID: %s", ["ninguna"] = "keine", ["ninguno"] = "keins", ["desconocidos"] = "unbekannt", ["desconocida"] = "unbekannt", ["sin spec"] = "keine Spezialisierung",
+    ["Set de equipo de Blizzard"] = "Blizzard-Ausrüstungsset", ["Selecciona un set por nombre. ModeShift guardara el nombre y el ID si Blizzard lo expone."] = "Wähle ein Set nach Namen. ModeShift speichert Name und ID, wenn Blizzard sie bereitstellt.", ["Seleccion actual: %s"] = "Aktuelle Auswahl: %s", ["no cambiar equipo"] = "Ausrüstung nicht ändern",
+    ["Loadout de talentos de Blizzard"] = "Blizzard-Talentvorlage", ["Selecciona una configuracion de talentos de la spec actual. Si el perfil pertenece a otra spec, cambia de spec antes de elegir."] = "Wähle eine Talentvorlage der aktuellen Spezialisierung. Gehört das Profil zu einer anderen Spezialisierung, wechsle vorher.", ["Talentos activos ahora: %s"] = "Aktive Talente: %s", ["Este perfil aplicara: %s"] = "Dieses Profil wendet an: %s", ["no cambiar talentos"] = "Talente nicht ändern", ["Abrir talentos"] = "Talente öffnen", ["Actualizar"] = "Aktualisieren",
+    ["Layout de Edit Mode"] = "Bearbeitungsmodus-Layout", ["Selecciona un layout de la UI de Blizzard si la API de Edit Mode esta disponible."] = "Wähle ein Blizzard-UI-Layout, wenn die Bearbeitungsmodus-API verfügbar ist.", ["UI activa ahora: %s"] = "Aktive UI: %s", ["no cambiar layout"] = "Layout nicht ändern", ["No cambiar layout"] = "Layout nicht ändern", ["Abrir modo edicion"] = "Bearbeitungsmodus öffnen",
+    ["Marca los addons que deben cargarse en este perfil. Los no marcados se desactivaran al aplicar el perfil. Si hay perfiles internos, puedes elegirlos a la derecha."] = "Markiere die Addons, die in diesem Profil geladen werden. Nicht markierte Addons werden beim Anwenden deaktiviert. Interne Profile wählst du rechts.",
+    ["Estado inicial capturado automaticamente al crear el perfil."] = "Ausgangszustand beim Erstellen automatisch erfasst.", ["cargado/activo"] = "geladen/aktiv", ["desactivado"] = "deaktiviert", ["%s - %s"] = "%s - %s", ["Actual: %s"] = "Aktuell: %s", ["Diseno actual: %s"] = "Aktuelles Layout: %s", ["No he encontrado perfiles"] = "Keine Profile gefunden", ["No he encontrado disenos"] = "Keine Layouts gefunden", ["No he encontrado configs"] = "Keine Konfigurationen gefunden", ["%s disenos"] = "%s-Layouts", ["%s config"] = "%s-Konfiguration",
+    ["Opciones avanzadas de consola"] = "Erweiterte Konsolenoptionen", ["Aplicar variables de consola en este perfil"] = "Konsolenvariablen in diesem Profil anwenden", ["Anadir ajuste"] = "Einstellung hinzufügen", ["Quitar"] = "Entfernen", ["No hay variables de consola configuradas."] = "Keine Konsolenvariablen konfiguriert.",
+    ["Perfil seleccionado: %s"] = "Ausgewähltes Profil: %s", ["Copiar todo"] = "Alles kopieren", ["Pegar"] = "Einfügen", ["Cerrar"] = "Schließen", ["No hay perfiles creados"] = "Keine Profile erstellt", ["%s (actual)"] = "%s (aktuell)",
+  },
+  ruRU = {
+    ["Nombre"] = "Имя", ["Descripcion"] = "Описание", ["Datos del perfil"] = "Данные профиля", ["Perfil activo en menus"] = "Показывать профиль в меню", ["Exportar perfil"] = "Экспорт профиля", ["Importar perfil"] = "Импорт профиля",
+    ["Asignada: %s"] = "Назначено: %s", ["ID interno: %s"] = "Внутренний ID: %s", ["ninguna"] = "нет", ["ninguno"] = "нет", ["desconocidos"] = "неизвестно", ["desconocida"] = "неизвестно", ["sin spec"] = "без спека",
+    ["Set de equipo de Blizzard"] = "Комплект экипировки Blizzard", ["Seleccion actual: %s"] = "Текущий выбор: %s", ["no cambiar equipo"] = "не менять экипировку",
+    ["Loadout de talentos de Blizzard"] = "Набор талантов Blizzard", ["Talentos activos ahora: %s"] = "Активные таланты: %s", ["Este perfil aplicara: %s"] = "Профиль применит: %s", ["no cambiar talentos"] = "не менять таланты", ["Abrir talentos"] = "Открыть таланты", ["Actualizar"] = "Обновить",
+    ["Layout de Edit Mode"] = "Макет режима редактирования", ["UI activa ahora: %s"] = "Активный интерфейс: %s", ["no cambiar layout"] = "не менять макет", ["No cambiar layout"] = "Не менять макет", ["Abrir modo edicion"] = "Открыть режим редактирования",
+    ["Estado inicial capturado automaticamente al crear el perfil."] = "Начальное состояние автоматически сохранено при создании профиля.", ["cargado/activo"] = "загружен/активен", ["desactivado"] = "отключен", ["%s - %s"] = "%s - %s", ["Actual: %s"] = "Текущий: %s", ["Diseno actual: %s"] = "Текущий макет: %s", ["No he encontrado perfiles"] = "Профили не найдены", ["No he encontrado disenos"] = "Макеты не найдены", ["No he encontrado configs"] = "Конфиги не найдены", ["%s disenos"] = "Макеты %s", ["%s config"] = "Конфиг %s",
+    ["Opciones avanzadas de consola"] = "Расширенные параметры консоли", ["Aplicar variables de consola en este perfil"] = "Применять переменные консоли в этом профиле", ["Anadir ajuste"] = "Добавить", ["Quitar"] = "Удалить", ["No hay variables de consola configuradas."] = "Переменные консоли не настроены.",
+    ["Perfil seleccionado: %s"] = "Выбранный профиль: %s", ["Copiar todo"] = "Копировать всё", ["Pegar"] = "Вставить", ["Cerrar"] = "Закрыть", ["No hay perfiles creados"] = "Профили не созданы", ["%s (actual)"] = "%s (текущий)",
+  },
+  itIT = {
+    ["Nombre"] = "Nome", ["Descripcion"] = "Descrizione", ["Datos del perfil"] = "Dati profilo", ["Perfil activo en menus"] = "Profilo visibile nei menu", ["Exportar perfil"] = "Esporta profilo", ["Importar perfil"] = "Importa profilo",
+    ["Asignada: %s"] = "Assegnata: %s", ["ID interno: %s"] = "ID interno: %s", ["ninguna"] = "nessuna", ["ninguno"] = "nessuno", ["desconocidos"] = "sconosciuti", ["desconocida"] = "sconosciuta", ["sin spec"] = "senza spec",
+    ["Set de equipo de Blizzard"] = "Set equipaggiamento Blizzard", ["Seleccion actual: %s"] = "Selezione attuale: %s", ["no cambiar equipo"] = "non cambiare equipaggiamento",
+    ["Loadout de talentos de Blizzard"] = "Configurazione talenti Blizzard", ["Talentos activos ahora: %s"] = "Talenti attivi ora: %s", ["Este perfil aplicara: %s"] = "Questo profilo applicherà: %s", ["no cambiar talentos"] = "non cambiare talenti", ["Abrir talentos"] = "Apri talenti", ["Actualizar"] = "Aggiorna",
+    ["Layout de Edit Mode"] = "Layout modalità modifica", ["UI activa ahora: %s"] = "UI attiva ora: %s", ["no cambiar layout"] = "non cambiare layout", ["No cambiar layout"] = "Non cambiare layout", ["Abrir modo edicion"] = "Apri modalità modifica",
+    ["Estado inicial capturado automaticamente al crear el perfil."] = "Stato iniziale catturato automaticamente alla creazione del profilo.", ["cargado/activo"] = "caricato/attivo", ["desactivado"] = "disattivato", ["%s - %s"] = "%s - %s", ["Actual: %s"] = "Attuale: %s", ["Diseno actual: %s"] = "Layout attuale: %s", ["No he encontrado perfiles"] = "Nessun profilo trovato", ["No he encontrado disenos"] = "Nessun layout trovato", ["No he encontrado configs"] = "Nessuna config trovata", ["%s disenos"] = "Layout %s", ["%s config"] = "Config %s",
+    ["Opciones avanzadas de consola"] = "Opzioni console avanzate", ["Aplicar variables de consola en este perfil"] = "Applica variabili console in questo profilo", ["Anadir ajuste"] = "Aggiungi", ["Quitar"] = "Rimuovi", ["No hay variables de consola configuradas."] = "Nessuna variabile console configurata.",
+    ["Perfil seleccionado: %s"] = "Profilo selezionato: %s", ["Copiar todo"] = "Copia tutto", ["Pegar"] = "Incolla", ["Cerrar"] = "Chiudi", ["No hay perfiles creados"] = "Nessun profilo creato", ["%s (actual)"] = "%s (attuale)",
+  },
+  ptBR = {
+    ["Nombre"] = "Nome", ["Descripcion"] = "Descrição", ["Datos del perfil"] = "Dados do perfil", ["Perfil activo en menus"] = "Perfil visível nos menus", ["Exportar perfil"] = "Exportar perfil", ["Importar perfil"] = "Importar perfil",
+    ["Asignada: %s"] = "Atribuída: %s", ["ID interno: %s"] = "ID interno: %s", ["ninguna"] = "nenhuma", ["ninguno"] = "nenhum", ["desconocidos"] = "desconhecidos", ["desconocida"] = "desconhecida", ["sin spec"] = "sem spec",
+    ["Set de equipo de Blizzard"] = "Conjunto de equipamento Blizzard", ["Seleccion actual: %s"] = "Seleção atual: %s", ["no cambiar equipo"] = "não alterar equipamento",
+    ["Loadout de talentos de Blizzard"] = "Configuração de talentos Blizzard", ["Talentos activos ahora: %s"] = "Talentos ativos agora: %s", ["Este perfil aplicara: %s"] = "Este perfil aplicará: %s", ["no cambiar talentos"] = "não alterar talentos", ["Abrir talentos"] = "Abrir talentos", ["Actualizar"] = "Atualizar",
+    ["Layout de Edit Mode"] = "Layout do modo de edição", ["UI activa ahora: %s"] = "Interface ativa agora: %s", ["no cambiar layout"] = "não alterar layout", ["No cambiar layout"] = "Não alterar layout", ["Abrir modo edicion"] = "Abrir modo de edição",
+    ["Estado inicial capturado automaticamente al crear el perfil."] = "Estado inicial capturado automaticamente ao criar o perfil.", ["cargado/activo"] = "carregado/ativo", ["desactivado"] = "desativado", ["%s - %s"] = "%s - %s", ["Actual: %s"] = "Atual: %s", ["Diseno actual: %s"] = "Layout atual: %s", ["No he encontrado perfiles"] = "Nenhum perfil encontrado", ["No he encontrado disenos"] = "Nenhum layout encontrado", ["No he encontrado configs"] = "Nenhuma config encontrada", ["%s disenos"] = "Layouts %s", ["%s config"] = "Config %s",
+    ["Opciones avanzadas de consola"] = "Opções avançadas de console", ["Aplicar variables de consola en este perfil"] = "Aplicar variáveis de console neste perfil", ["Anadir ajuste"] = "Adicionar", ["Quitar"] = "Remover", ["No hay variables de consola configuradas."] = "Nenhuma variável de console configurada.",
+    ["Perfil seleccionado: %s"] = "Perfil selecionado: %s", ["Copiar todo"] = "Copiar tudo", ["Pegar"] = "Colar", ["Cerrar"] = "Fechar", ["No hay perfiles creados"] = "Nenhum perfil criado", ["%s (actual)"] = "%s (atual)",
+  },
+}
+
+local HELP_EXTRA = {
+  esES = {
+    ["Abrir o cerrar la configuracion"] = "Abrir o cerrar la configuración",
+    ["Mostrar el menu rapido en el chat"] = "Mostrar el menú rápido en el chat",
+    ["Listar perfiles disponibles"] = "Listar perfiles disponibles",
+    ["Ver el perfil activo"] = "Ver el perfil activo",
+    ["Aplicar un perfil por ID interno"] = "Aplicar un perfil por ID interno",
+    ["Reaplicar el perfil activo"] = "Reaplicar el perfil activo",
+    ["Crear perfiles de ejemplo para la spec actual"] = "Crear perfiles de ejemplo para la spec actual",
+    ["Asignar set de equipo por nombre"] = "Asignar set de equipo por nombre",
+    ["Asignar loadout de talentos por nombre"] = "Asignar configuración de talentos por nombre",
+    ["Forzar addon activo o desactivado en un perfil"] = "Forzar addon activo o desactivado en un perfil",
+    ["Listar addons instalados"] = "Listar addons instalados",
+    ["Mostrar diagnostico rapido"] = "Mostrar diagnóstico rápido",
+    ["Recargar interfaz cuando haya cambios de addons"] = "Recargar interfaz cuando haya cambios de addons",
+    ["Activar o desactivar mensajes de debug"] = "Activar o desactivar mensajes de debug",
+    ["Nuevo crea un perfil desde tu estado actual."] = "Nuevo crea un perfil desde tu estado actual.",
+    ["Guardar y usar guarda el estado actual y marca ese perfil como actual."] = "Guardar y usar guarda el estado actual y marca ese perfil como actual.",
+    ["Actualizar perfil guarda el estado actual en el perfil seleccionado sin aplicarlo."] = "Actualizar perfil guarda el estado actual en el perfil seleccionado sin aplicarlo.",
+    ["Si cambias addons, ModeShift pedira reload cuando sea necesario."] = "Si cambias addons, ModeShift pedirá reload cuando sea necesario.",
+    ["El menu del minimapa permite aplicar perfiles por spec y tipo."] = "El menú del minimapa permite aplicar perfiles por spec y tipo.",
+    ["En la pestana Addons, CooldownManagerCentered permite elegir el perfil interno y el diseno CDM."] = "En la pestaña Addons, CooldownManagerCentered permite elegir el perfil interno y el diseño CDM.",
+    ["ModeShift guarda por perfil los trackers de CDM/CDS, su posicion, tamano, direccion y estilo."] = "ModeShift guarda por perfil los trackers de CDM/CDS, su posición, tamaño, dirección y estilo.",
+    ["Los trackers se colocan desde el modo edicion de Blizzard/CDM: abre /cdm o /cds, entra en modo edicion y mueve los trackers en pantalla."] = "Los trackers se colocan desde el modo edición de Blizzard/CDM: abre /cdm o /cds, entra en modo edición y mueve los trackers en pantalla.",
+    ["Despues de mover trackers o cambiar su tamano/direccion, vuelve a ModeShift y pulsa Actualizar perfil para guardar esa colocacion."] = "Después de mover trackers o cambiar su tamaño/dirección, vuelve a ModeShift y pulsa Actualizar perfil para guardar esa colocación.",
+    ["Tambien guarda por perfil la colocacion de Hechizos y Beneficios: esenciales, utilidad, iconos, barras y no mostrados."] = "También guarda por perfil la colocación de Hechizos y Beneficios: esenciales, utilidad, iconos, barras y no mostrados.",
+    ["Hechizos y Beneficios se organizan dentro de /cdm o /cds arrastrandolos entre secciones; ModeShift captura esa organizacion por perfil."] = "Hechizos y Beneficios se organizan dentro de /cdm o /cds arrastrándolos entre secciones; ModeShift captura esa organización por perfil.",
+    ["La captura usa IDs y claves internas del addon, asi que funciona igual aunque el juego este en otro idioma."] = "La captura usa IDs y claves internas del addon, así que funciona igual aunque el juego esté en otro idioma.",
+    ["Si cambias algo dentro de /cdm o /cds, vuelve a ModeShift y pulsa Actualizar perfil para guardar ese estado en el perfil seleccionado."] = "Si cambias algo dentro de /cdm o /cds, vuelve a ModeShift y pulsa Actualizar perfil para guardar ese estado en el perfil seleccionado.",
+    ["Guardar y usar guarda el estado actual de CDM/CDS y aplica ese perfil de ModeShift como perfil activo."] = "Guardar y usar guarda el estado actual de CDM/CDS y aplica ese perfil de ModeShift como perfil activo.",
+  },
+  frFR = {
+    ["Abrir o cerrar la configuracion"] = "Ouvrir ou fermer la configuration", ["Mostrar el menu rapido en el chat"] = "Afficher le menu rapide dans le chat", ["Listar perfiles disponibles"] = "Lister les profils disponibles", ["Ver el perfil activo"] = "Voir le profil actif", ["Aplicar un perfil por ID interno"] = "Appliquer un profil par ID interne", ["Reaplicar el perfil activo"] = "Réappliquer le profil actif", ["Crear perfiles de ejemplo para la spec actual"] = "Créer des profils d'exemple pour la spé actuelle", ["Asignar set de equipo por nombre"] = "Assigner un ensemble par nom", ["Asignar loadout de talentos por nombre"] = "Assigner une configuration de talents par nom", ["Forzar addon activo o desactivado en un perfil"] = "Forcer un addon actif ou désactivé dans un profil", ["Listar addons instalados"] = "Lister les addons installés", ["Mostrar diagnostico rapido"] = "Afficher le diagnostic rapide", ["Recargar interfaz cuando haya cambios de addons"] = "Recharger l'interface après des changements d'addons", ["Activar o desactivar mensajes de debug"] = "Activer ou désactiver les messages de debug",
+    ["Nuevo crea un perfil desde tu estado actual."] = "Nouveau crée un profil depuis ton état actuel.", ["Guardar y usar guarda el estado actual y marca ese perfil como actual."] = "Enregistrer et utiliser garde l'état actuel et marque ce profil comme actif.", ["Actualizar perfil guarda el estado actual en el perfil seleccionado sin aplicarlo."] = "Mettre à jour garde l'état actuel dans le profil sélectionné sans l'appliquer.", ["Si cambias addons, ModeShift pedira reload cuando sea necesario."] = "Si tu changes des addons, ModeShift demandera un rechargement si nécessaire.", ["El menu del minimapa permite aplicar perfiles por spec y tipo."] = "Le menu de la minimap applique les profils par spé et type.",
+    ["En la pestana Addons, CooldownManagerCentered permite elegir el perfil interno y el diseno CDM."] = "Dans l'onglet Addons, CooldownManagerCentered permet de choisir le profil interne et le modèle CDM.", ["ModeShift guarda por perfil los trackers de CDM/CDS, su posicion, tamano, direccion y estilo."] = "ModeShift garde par profil les trackers CDM/CDS, leur position, taille, direction et style.", ["Los trackers se colocan desde el modo edicion de Blizzard/CDM: abre /cdm o /cds, entra en modo edicion y mueve los trackers en pantalla."] = "Les trackers se placent depuis le mode édition Blizzard/CDM : ouvre /cdm ou /cds, entre en mode édition et déplace-les à l'écran.", ["Despues de mover trackers o cambiar su tamano/direccion, vuelve a ModeShift y pulsa Actualizar perfil para guardar esa colocacion."] = "Après avoir déplacé ou redimensionné les trackers, reviens à ModeShift et clique Mettre à jour.", ["Tambien guarda por perfil la colocacion de Hechizos y Beneficios: esenciales, utilidad, iconos, barras y no mostrados."] = "Il garde aussi par profil l'organisation des sorts et avantages : essentiels, utilité, icônes, barres et non affichés.", ["Hechizos y Beneficios se organizan dentro de /cdm o /cds arrastrandolos entre secciones; ModeShift captura esa organizacion por perfil."] = "Les sorts et avantages se déplacent dans /cdm ou /cds entre sections ; ModeShift capture cette organisation par profil.", ["La captura usa IDs y claves internas del addon, asi que funciona igual aunque el juego este en otro idioma."] = "La capture utilise des IDs et clés internes, donc elle fonctionne quel que soit l'idiome du jeu.", ["Si cambias algo dentro de /cdm o /cds, vuelve a ModeShift y pulsa Actualizar perfil para guardar ese estado en el perfil seleccionado."] = "Si tu changes quelque chose dans /cdm ou /cds, reviens à ModeShift et clique Mettre à jour.", ["Guardar y usar guarda el estado actual de CDM/CDS y aplica ese perfil de ModeShift como perfil activo."] = "Enregistrer et utiliser garde l'état CDM/CDS actuel et active ce profil ModeShift.",
+  },
+  deDE = { ["Abrir o cerrar la configuracion"] = "Konfiguration öffnen oder schließen", ["Mostrar el menu rapido en el chat"] = "Schnellmenü im Chat anzeigen", ["Listar perfiles disponibles"] = "Verfügbare Profile auflisten", ["Ver el perfil activo"] = "Aktives Profil anzeigen", ["Nuevo crea un perfil desde tu estado actual."] = "Neu erstellt ein Profil aus deinem aktuellen Zustand.", ["Guardar y usar guarda el estado actual y marca ese perfil como actual."] = "Speichern und nutzen speichert den aktuellen Zustand und setzt dieses Profil aktiv.", ["Actualizar perfil guarda el estado actual en el perfil seleccionado sin aplicarlo."] = "Profil aktualisieren speichert den aktuellen Zustand im gewählten Profil, ohne es anzuwenden.", ["Si cambias addons, ModeShift pedira reload cuando sea necesario."] = "Wenn du Addons änderst, fordert ModeShift bei Bedarf ein Neuladen an.", ["El menu del minimapa permite aplicar perfiles por spec y tipo."] = "Das Minimap-Menü wendet Profile nach Spezialisierung und Typ an." },
+  ruRU = { ["Abrir o cerrar la configuracion"] = "Открыть или закрыть настройки", ["Mostrar el menu rapido en el chat"] = "Показать быстрое меню в чате", ["Listar perfiles disponibles"] = "Показать доступные профили", ["Ver el perfil activo"] = "Показать активный профиль", ["Nuevo crea un perfil desde tu estado actual."] = "Новый профиль создается из текущего состояния.", ["Guardar y usar guarda el estado actual y marca ese perfil como actual."] = "Сохранить и использовать сохраняет текущее состояние и делает профиль активным.", ["Actualizar perfil guarda el estado actual en el perfil seleccionado sin aplicarlo."] = "Обновить профиль сохраняет текущее состояние в выбранный профиль без применения.", ["Si cambias addons, ModeShift pedira reload cuando sea necesario."] = "Если меняются аддоны, ModeShift попросит перезагрузку при необходимости.", ["El menu del minimapa permite aplicar perfiles por spec y tipo."] = "Меню миникарты применяет профили по спеку и типу." },
+  itIT = { ["Abrir o cerrar la configuracion"] = "Apri o chiudi la configurazione", ["Mostrar el menu rapido en el chat"] = "Mostra il menu rapido in chat", ["Listar perfiles disponibles"] = "Elenca profili disponibili", ["Ver el perfil activo"] = "Mostra profilo attivo", ["Nuevo crea un perfil desde tu estado actual."] = "Nuovo crea un profilo dallo stato attuale.", ["Guardar y usar guarda el estado actual y marca ese perfil como actual."] = "Salva e usa salva lo stato attuale e rende attivo quel profilo.", ["Actualizar perfil guarda el estado actual en el perfil seleccionado sin aplicarlo."] = "Aggiorna profilo salva lo stato attuale nel profilo selezionato senza applicarlo.", ["Si cambias addons, ModeShift pedira reload cuando sea necesario."] = "Se cambi addon, ModeShift chiederà il reload quando serve.", ["El menu del minimapa permite aplicar perfiles por spec y tipo."] = "Il menu della minimappa applica profili per spec e tipo." },
+  ptBR = { ["Abrir o cerrar la configuracion"] = "Abrir ou fechar a configuração", ["Mostrar el menu rapido en el chat"] = "Mostrar o menu rápido no chat", ["Listar perfiles disponibles"] = "Listar perfis disponíveis", ["Ver el perfil activo"] = "Ver o perfil ativo", ["Nuevo crea un perfil desde tu estado actual."] = "Novo cria um perfil a partir do estado atual.", ["Guardar y usar guarda el estado actual y marca ese perfil como actual."] = "Salvar e usar salva o estado atual e marca esse perfil como ativo.", ["Actualizar perfil guarda el estado actual en el perfil seleccionado sin aplicarlo."] = "Atualizar perfil salva o estado atual no perfil selecionado sem aplicá-lo.", ["Si cambias addons, ModeShift pedira reload cuando sea necesario."] = "Se você alterar addons, ModeShift pedirá reload quando necessário.", ["El menu del minimapa permite aplicar perfiles por spec y tipo."] = "O menu do minimapa aplica perfis por spec e tipo." },
+}
+
+for languageKey, entries in pairs(EXTRA) do
+  T[languageKey] = T[languageKey] or {}
+  for key, value in pairs(entries) do
+    T[languageKey][key] = value
+  end
+end
+
+for languageKey, entries in pairs(HELP_EXTRA) do
+  T[languageKey] = T[languageKey] or {}
+  for key, value in pairs(entries) do
+    T[languageKey][key] = value
+  end
+end
+
+Locale.translations = T
+
+function ModeShift:GetLanguageKey()
+  local configured = self.Database and self.Database:GetGlobalSetting("locale") or "auto"
+  if configured and configured ~= "auto" then
+    return configured
+  end
+  return mapClientLocale(GetLocale and GetLocale() or nil)
+end
+
+function ModeShift:SetLanguageKey(key)
+  key = tostring(key or "")
+  local valid = false
+  for _, language in ipairs(Locale.languages) do
+    if language.key == key then
+      valid = true
+      break
+    end
+  end
+  if not valid then
+    key = "auto"
+  end
+  if self.Database then
+    self.Database:SetGlobalSetting("locale", key)
+  end
+end
+
+function ModeShift:GetLanguageLabel(key)
+  key = key or self:GetLanguageKey()
+  for _, language in ipairs(Locale.languages) do
+    if language.key == key then
+      return language.label
+    end
+  end
+  return "English"
+end
+
+function ModeShift:L(text, ...)
+  local key = self:GetLanguageKey()
+  local value = T[key] and T[key][text]
+  if not value and key ~= "enUS" then
+    value = T.enUS[text]
+  end
+  value = value or text
+  if select("#", ...) > 0 then
+    return string.format(value, ...)
+  end
+  return value
+end
+
+ModeShift.Locale = Locale

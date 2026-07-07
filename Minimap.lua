@@ -2,6 +2,10 @@ local ModeShift = _G.ModeShift
 
 local MinimapModule = {}
 
+local function L(text)
+  return ModeShift.L and ModeShift:L(text) or text
+end
+
 local function getAngle()
   local char = ModeShift.Database and ModeShift.Database:GetCharDB()
   if char and char.minimapAngle then
@@ -108,9 +112,9 @@ function MinimapModule:Initialize()
   button:SetScript("OnEnter", function(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:AddLine("ModeShift")
-    GameTooltip:AddLine("Click izquierdo: configuracion", 1, 1, 1)
-    GameTooltip:AddLine("Click derecho: cambio rapido", 1, 1, 1)
-    GameTooltip:AddLine("Arrastrar: mover alrededor del minimapa", 1, 1, 1)
+    GameTooltip:AddLine(L("Click izquierdo: configuracion"), 1, 1, 1)
+    GameTooltip:AddLine(L("Click derecho: cambio rapido"), 1, 1, 1)
+    GameTooltip:AddLine(L("Arrastrar: mover alrededor del minimapa"), 1, 1, 1)
     GameTooltip:Show()
   end)
   button:SetScript("OnLeave", function()
@@ -155,8 +159,8 @@ function _G.ModeShift_OnAddonCompartmentEnter()
   if GameTooltip then
     GameTooltip:SetOwner(AddonCompartmentFrame or UIParent, "ANCHOR_LEFT")
     GameTooltip:AddLine("ModeShift")
-    GameTooltip:AddLine("Click: configuracion", 1, 1, 1)
-    GameTooltip:AddLine("Click derecho: menu rapido", 1, 1, 1)
+    GameTooltip:AddLine(L("Click: configuracion"), 1, 1, 1)
+    GameTooltip:AddLine(L("Click derecho: menu rapido"), 1, 1, 1)
     GameTooltip:Show()
   end
 end

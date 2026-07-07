@@ -16,6 +16,10 @@ local function call(method, ...)
   end
 end
 
+local function L(text)
+  return ModeShift.L and ModeShift:L(text) or text
+end
+
 function ModeShift:RegisterModule(name, module)
   if not name or type(module) ~= "table" then
     return
@@ -42,12 +46,12 @@ function ModeShift:SafeCall(label, fn, ...)
     return false, label .. " is not callable"
   end
 
-  local ok, result1, result2, result3 = pcall(fn, ...)
+  local ok, result1, result2, result3, result4, result5, result6, result7, result8, result9, result10 = pcall(fn, ...)
   if not ok then
     return false, tostring(result1)
   end
 
-  return true, result1, result2, result3
+  return true, result1, result2, result3, result4, result5, result6, result7, result8, result9, result10
 end
 
 function ModeShift:IsInCombat()
@@ -246,12 +250,12 @@ function ModeShift:BuildOptionsPanel(panel)
   description:SetPoint("TOPLEFT", version, "BOTTOMLEFT", 0, -18)
   description:SetWidth(620)
   description:SetJustifyH("LEFT")
-  description:SetText("Gestiona perfiles de spec, equipo, talentos, UI, addons, perfiles internos de addons y CVars.")
+  description:SetText(L("Gestiona perfiles de spec, equipo, talentos, UI, addons, perfiles internos de addons y CVars."))
 
   local openButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
   openButton:SetSize(220, 28)
   openButton:SetPoint("TOPLEFT", description, "BOTTOMLEFT", 0, -24)
-  openButton:SetText("Abrir ModeShift")
+  openButton:SetText(L("Abrir ModeShift"))
   openButton:SetScript("OnClick", function()
     ModeShift:ShowConfig()
   end)
@@ -259,7 +263,7 @@ function ModeShift:BuildOptionsPanel(panel)
   local quickButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
   quickButton:SetSize(180, 28)
   quickButton:SetPoint("LEFT", openButton, "RIGHT", 10, 0)
-  quickButton:SetText("Menu rapido")
+  quickButton:SetText(L("Menu rapido"))
   quickButton:SetScript("OnClick", function(button)
     if ModeShift.QuickMenu then
       ModeShift.QuickMenu:Open(button, { forceMenu = true })
@@ -268,13 +272,19 @@ function ModeShift:BuildOptionsPanel(panel)
 
   local commands = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
   commands:SetPoint("TOPLEFT", openButton, "BOTTOMLEFT", 0, -28)
-  commands:SetText("Comandos principales")
+  commands:SetText(L("Comandos principales"))
 
   local body = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
   body:SetPoint("TOPLEFT", commands, "BOTTOMLEFT", 0, -10)
   body:SetWidth(620)
   body:SetJustifyH("LEFT")
-  body:SetText("/ms config - abrir configuracion\n/ms quick - menu rapido\n/ms current - perfil actual\n/ms reload - recargar interfaz\n/ms doctor - diagnostico rapido")
+  body:SetText(table.concat({
+    L("/ms config - abrir configuracion"),
+    L("/ms quick - menu rapido"),
+    L("/ms current - perfil actual"),
+    L("/ms reload - recargar interfaz"),
+    L("/ms doctor - diagnostico rapido"),
+  }, "\n"))
 end
 
 function ModeShift:RegisterOptionsPanel()
@@ -334,13 +344,13 @@ function ModeShift:RefreshConfig()
 
   for _, profile in ipairs(profiles) do
     local marker = profile.id == activeProfileId and "*" or " "
-    local spec = profile.specName or profile.specId or "sin spec"
+    local spec = profile.specName or profile.specId or self:L("sin spec")
     local mode = profile.modeType or "CUSTOM"
     table.insert(lines, string.format("%s %s  [%s / %s]\n    id: %s", marker, profile.name or profile.id, spec, mode, profile.id))
   end
 
   if #lines == 0 then
-    table.insert(lines, "No hay perfiles todavia. Usa /ms create para crear ejemplos para la spec actual.")
+    table.insert(lines, self:L("No hay perfiles todavia. Usa /ms create para crear ejemplos para la spec actual."))
   end
 
   self.ConfigFrame.body:SetText(table.concat(lines, "\n\n"))
@@ -432,3 +442,4 @@ registerEvent("PLAYER_EQUIPMENT_CHANGED")
 registerEvent("PLAYER_TALENT_UPDATE")
 registerEvent("TRAIT_CONFIG_UPDATED")
 registerEvent("ACTIVE_COMBAT_CONFIG_CHANGED")
+registerEvent("UI_ERROR_MESSAGE")

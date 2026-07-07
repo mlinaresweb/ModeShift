@@ -43,10 +43,57 @@ local HELP_COMMANDS = {
   { command = "/ms debug", text = "Activar o desactivar mensajes de debug" },
 }
 
+local function L(text, ...)
+  if ModeShift and ModeShift.L then
+    return ModeShift:L(text, ...)
+  end
+  return text
+end
+
+local function setButtonText(button, text)
+  if not button then
+    return
+  end
+
+  local value = L(text or "")
+  button:SetText(value)
+
+  local fontString = button:GetFontString()
+  if not fontString then
+    return
+  end
+
+  if not button.modeShiftFont then
+    local font, size, flags = fontString:GetFont()
+    button.modeShiftFont = { font = font, size = size or 10, flags = flags }
+  end
+
+  local font = button.modeShiftFont.font
+  local size = button.modeShiftFont.size or 10
+  local flags = button.modeShiftFont.flags
+  if font then
+    fontString:SetFont(font, size, flags)
+  end
+  if fontString.SetWordWrap then
+    fontString:SetWordWrap(false)
+  end
+  fontString:SetJustifyH("CENTER")
+  if fontString.SetWidth then
+    fontString:SetWidth(math.max(20, (button:GetWidth() or 80) - 12))
+  end
+
+  local maxWidth = math.max(20, (button:GetWidth() or 80) - 12)
+  while font and size > 8 and fontString:GetStringWidth() > maxWidth do
+    size = size - 1
+    fontString:SetFont(font, size, flags)
+  end
+end
+
 local function makeButton(parent, text, width, height, onClick)
   local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
   button:SetSize(width or 120, height or 24)
-  button:SetText(text or "")
+  button.modeShiftTextKey = text
+  setButtonText(button, text or "")
   button:RegisterForClicks("AnyUp")
   if onClick then
     button:SetScript("OnClick", onClick)
@@ -72,7 +119,12 @@ end
 local function makeCheck(parent, text, checked, onClick)
   local check = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
   check:SetSize(24, 24)
-  check.Text:SetText(text or "")
+  check.modeShiftTextKey = text
+  check.Text:SetText(L(text or ""))
+  check.Text:SetWidth(520)
+  if check.Text.SetWordWrap then
+    check.Text:SetWordWrap(false)
+  end
   check:SetChecked(checked and true or false)
   if onClick then
     check:SetScript("OnClick", function(self)
@@ -95,7 +147,8 @@ local function makeText(parent, text, font)
   local label = parent:CreateFontString(nil, "OVERLAY", font or "GameFontHighlightSmall")
   label:SetJustifyH("LEFT")
   label:SetJustifyV("TOP")
-  label:SetText(text or "")
+  label.modeShiftTextKey = text
+  label:SetText(L(text or ""))
   return label
 end
 
@@ -103,7 +156,7 @@ local function applyIconTexture(icon, texture)
   if type(texture) == "table" then
     if texture.atlas and icon.SetAtlas then
       local ok = pcall(icon.SetAtlas, icon, texture.atlas)
-      if ok then
+      if ok and (not icon.GetTexture or icon:GetTexture()) then
         return true
       end
     end
@@ -116,20 +169,30 @@ local function applyIconTexture(icon, texture)
   end
 
   if type(texture) == "number" then
+    icon:SetTexture(nil)
     local ok = pcall(icon.SetTexture, icon, texture)
-    return ok
+    return ok and (not icon.GetTexture or icon:GetTexture())
   end
 
   if type(texture) == "string" and texture ~= "" then
+    local numericTexture = texture:match("^%s*(%d+)%s*$")
+    if numericTexture then
+      icon:SetTexture(nil)
+      local ok = pcall(icon.SetTexture, icon, tonumber(numericTexture))
+      return ok and (not icon.GetTexture or icon:GetTexture())
+    end
+
     if not texture:find("\\") and not texture:find("/") and icon.SetAtlas then
+      icon:SetTexture(nil)
       local atlasOk = pcall(icon.SetAtlas, icon, texture)
-      if atlasOk then
+      if atlasOk and (not icon.GetTexture or icon:GetTexture()) then
         return true
       end
     end
 
+    icon:SetTexture(nil)
     local ok, loaded = pcall(icon.SetTexture, icon, texture)
-    return ok and (loaded == true or texture:find("^Interface\\Icons\\"))
+    return ok and (loaded == true or (icon.GetTexture and icon:GetTexture()))
   end
 
   return false
@@ -139,7 +202,9 @@ local function makeIcon(parent, texture, size)
   local icon = parent:CreateTexture(nil, "ARTWORK")
   icon:SetSize(size or 18, size or 18)
   if not applyIconTexture(icon, texture) then
-    icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+    if not applyIconTexture(icon, 134400) then
+      icon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
+    end
   end
   if icon.SetTexCoord then
     icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
@@ -356,6 +421,11 @@ function ConfigUI:Initialize()
   frame.title:SetPoint("LEFT", frame.TitleBg or frame, "LEFT", 8, 0)
   frame.title:SetText("ModeShift")
 
+  frame.languageButton = makeButton(frame, "", 160, 20, function(button)
+    self:OpenLanguageDropdown(button)
+  end)
+  frame.languageButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -34, -5)
+
   frame.leftTitle = makeText(frame, "Perfiles", "GameFontNormal")
   frame.leftTitle:SetPoint("TOPLEFT", 16, -36)
 
@@ -438,6 +508,43 @@ function ConfigUI:Initialize()
   self.frame = frame
 end
 
+function ConfigUI:OpenLanguageDropdown(anchor)
+  local items = {}
+  local current = ModeShift:GetLanguageKey()
+  for _, language in ipairs((ModeShift.Locale and ModeShift.Locale.languages) or {}) do
+    local languageKey = language.key
+    table.insert(items, {
+      text = language.label,
+      selected = languageKey == current,
+      onClick = function()
+        ModeShift:SetLanguageKey(languageKey)
+        self:Refresh()
+      end,
+    })
+  end
+  self:OpenDropdown(anchor, "Idioma", items, 220)
+end
+
+function ConfigUI:RefreshStaticTexts()
+  local frame = self.frame
+  if not frame then
+    return
+  end
+
+  if frame.leftTitle then
+    frame.leftTitle:SetText(L("Perfiles"))
+  end
+  if frame.languageButton then
+    setButtonText(frame.languageButton, ModeShift:GetLanguageLabel())
+  end
+  if frame.newButton then setButtonText(frame.newButton, "Nuevo") end
+  if frame.duplicateButton then setButtonText(frame.duplicateButton, "Duplicar") end
+  if frame.deleteButton then setButtonText(frame.deleteButton, "Eliminar") end
+  if frame.applyButton then setButtonText(frame.applyButton, "Guardar y usar") end
+  if frame.reapplyButton then setButtonText(frame.reapplyButton, "Actualizar perfil") end
+  if frame.reloadButton then setButtonText(frame.reloadButton, "Reload UI") end
+end
+
 function ConfigUI:CloseDropdown()
   if CloseDropDownMenus then
     CloseDropDownMenus()
@@ -504,7 +611,7 @@ function ConfigUI:OpenDropdown(anchor, title, items, width)
   end
 
   local menuItems = items
-  local menuTitle = title or "Seleccion"
+  local menuTitle = L(title or "Seleccion")
   local menuWidth = width or 320
   local rowHeight = 22
   local titleHeight = 30
@@ -674,7 +781,7 @@ function ConfigUI:OpenDropdown(anchor, title, items, width)
         row.bg:SetAllPoints()
         row:SetSize(menuWidth - 12, rowHeight)
         row:SetPoint("TOPLEFT", dropdown, "TOPLEFT", 6, y)
-        row.text:SetText(tostring(itemData.text or ""))
+        row.text:SetText(L(tostring(itemData.text or "")))
         row.text:SetTextColor(disabled and 0.45 or 1, disabled and 0.45 or 0.82, disabled and 0.45 or 0.05)
         row:SetText("")
         row.check:SetShown(selected)
@@ -802,6 +909,7 @@ function ConfigUI:Refresh()
   end
 
   self:EnsureSelection()
+  self:RefreshStaticTexts()
   self:RefreshProfileList()
   self:RefreshTabs()
   self:RefreshEditor()
@@ -815,6 +923,13 @@ function ConfigUI:RefreshTabs()
 
   for key, button in pairs(self.frame.tabButtons) do
     button:SetEnabled(key ~= self.activeTab)
+  end
+
+  for _, tab in ipairs(TABS) do
+    local button = self.frame.tabButtons[tab.key]
+    if button then
+      setButtonText(button, tab.text)
+    end
   end
 end
 
@@ -837,7 +952,7 @@ function ConfigUI:RefreshProfileList()
   for _, profile in ipairs(profiles) do
     local name = profile.name or "Perfil"
     if profile.id == activeProfileId then
-      name = name .. "  |cff55ff55(activo)|r"
+      name = name .. "  |cff55ff55(" .. L("activo") .. ")|r"
     end
     local selected = profile.id == self.selectedProfileId
     local button = makeButton(child, name, 210, 26, function()
@@ -856,15 +971,19 @@ end
 function ConfigUI:AddSection(parent, text, y)
   local label = makeText(parent, text, "GameFontNormal")
   label:SetPoint("TOPLEFT", 4, y)
-  label:SetWidth(560)
+  label:SetWidth(650)
   return y - 28
 end
 
 function ConfigUI:AddDescription(parent, text, y)
   local label = makeText(parent, text, "GameFontHighlightSmall")
   label:SetPoint("TOPLEFT", 4, y)
-  label:SetWidth(560)
-  return y - 34
+  label:SetWidth(650)
+  if label.SetWordWrap then
+    label:SetWordWrap(true)
+  end
+  local height = label.GetStringHeight and label:GetStringHeight() or 18
+  return y - math.max(34, height + 14)
 end
 
 function ConfigUI:AddLabeledEdit(parent, labelText, value, y, width)
@@ -1094,8 +1213,7 @@ function ConfigUI:BuildProfileTab(parent, profile, y)
   y = rowY - 40
 
   y = self:AddSection(parent, "Spec", y)
-  local specText = "Asignada: " .. tostring(profile.specName or profile.specId or "ninguna")
-  local specLabel = makeText(parent, specText)
+  local specLabel = makeText(parent, L("Asignada: %s", tostring(profile.specName or profile.specId or L("ninguna"))))
   specLabel:SetPoint("TOPLEFT", 4, y)
   specLabel:SetWidth(360)
 
@@ -1117,7 +1235,7 @@ function ConfigUI:BuildProfileTab(parent, profile, y)
   preferredButton:SetPoint("LEFT", currentSpecButton, "RIGHT", 8, 0)
   y = y - 44
 
-  local internal = makeText(parent, "ID interno: " .. tostring(profile.id), "GameFontDisableSmall")
+  local internal = makeText(parent, L("ID interno: %s", tostring(profile.id)), "GameFontDisableSmall")
   internal:SetPoint("TOPLEFT", 4, y)
   internal:SetWidth(560)
   return y - 28
@@ -1127,11 +1245,11 @@ function ConfigUI:BuildEquipmentTab(parent, profile, y)
   y = self:AddSection(parent, "Set de equipo de Blizzard", y)
   y = self:AddDescription(parent, "Selecciona un set por nombre. ModeShift guardara el nombre y el ID si Blizzard lo expone.", y)
 
-  local current = "Seleccion actual: "
+  local current
   if profile.equipment and profile.equipment.enabled and profile.equipment.setName then
-    current = current .. profile.equipment.setName
+    current = L("Seleccion actual: %s", profile.equipment.setName)
   else
-    current = current .. "no cambiar equipo"
+    current = L("Seleccion actual: %s", L("no cambiar equipo"))
   end
   local label = makeText(parent, current, "GameFontHighlight")
   label:SetPoint("TOPLEFT", 4, y)
@@ -1187,16 +1305,16 @@ function ConfigUI:BuildTalentsTab(parent, profile, y)
   y = self:AddDescription(parent, "Selecciona una configuracion de talentos de la spec actual. Si el perfil pertenece a otra spec, cambia de spec antes de elegir.", y)
 
   local activeLoadout = ModeShift.TalentManager and ModeShift.TalentManager:GetCurrentLoadout(ModeShift:GetCurrentSpecId()) or nil
-  local activeLabel = makeText(parent, "Talentos activos ahora: " .. (activeLoadout and activeLoadout.name or "desconocidos"), "GameFontHighlight")
+  local activeLabel = makeText(parent, L("Talentos activos ahora: %s", activeLoadout and activeLoadout.name or L("desconocidos")), "GameFontHighlight")
   activeLabel:SetPoint("TOPLEFT", 4, y)
   activeLabel:SetWidth(560)
   y = y - 22
 
-  local current = "Este perfil aplicara: "
+  local current
   if profile.talents and profile.talents.enabled and profile.talents.configName then
-    current = current .. profile.talents.configName
+    current = L("Este perfil aplicara: %s", profile.talents.configName)
   else
-    current = current .. "no cambiar talentos"
+    current = L("Este perfil aplicara: %s", L("no cambiar talentos"))
   end
   local label = makeText(parent, current, "GameFontHighlight")
   label:SetPoint("TOPLEFT", 4, y)
@@ -1260,17 +1378,16 @@ function ConfigUI:BuildUITab(parent, profile, y)
   y = self:AddDescription(parent, "Selecciona un layout de la UI de Blizzard si la API de Edit Mode esta disponible.", y)
 
   local activeLayout = ModeShift.EditModeManager and ModeShift.EditModeManager:GetCurrentLayout() or nil
-  local activeText = "UI activa ahora: " .. (activeLayout and activeLayout.name or "desconocida")
-  local activeLabel = makeText(parent, activeText, "GameFontHighlight")
+  local activeLabel = makeText(parent, L("UI activa ahora: %s", activeLayout and activeLayout.name or L("desconocida")), "GameFontHighlight")
   activeLabel:SetPoint("TOPLEFT", 4, y)
   activeLabel:SetWidth(560)
   y = y - 22
 
-  local current = "Este perfil aplicara: "
+  local current
   if profile.editMode and profile.editMode.enabled and profile.editMode.layoutName then
-    current = current .. profile.editMode.layoutName
+    current = L("Este perfil aplicara: %s", profile.editMode.layoutName)
   else
-    current = current .. "no cambiar layout"
+    current = L("Este perfil aplicara: %s", L("no cambiar layout"))
   end
   local label = makeText(parent, current, "GameFontHighlight")
   label:SetPoint("TOPLEFT", 4, y)
@@ -1396,7 +1513,7 @@ function ConfigUI:BuildAddonsTab(parent, profile, y)
   y = y - 22
 
   for _, addon in ipairs(addons) do
-    local installedState = addon.enabled and "cargado/activo" or "desactivado"
+    local installedState = addon.enabled and L("cargado/activo") or L("desactivado")
     local shouldLoad = ModeShift.AddonManager:ShouldLoadInProfile(profile, addon)
 
     local loadCheck = makeCheck(parent, "", shouldLoad, function(checked)
@@ -1420,7 +1537,7 @@ function ConfigUI:BuildAddonsTab(parent, profile, y)
 
     local detailText = installedState
     if addon.title and addon.title ~= addon.name then
-      detailText = addon.name .. " - " .. installedState
+      detailText = L("%s - %s", addon.name, installedState)
     end
     local details = makeText(parent, detailText, "GameFontDisableSmall")
     details:SetPoint("TOPLEFT", addonTextX, y - 16)
@@ -1509,7 +1626,7 @@ function ConfigUI:OpenAddonProfileDropdown(anchor, profile, addonName)
 
   if currentProfile then
     table.insert(items, {
-      text = "Actual: " .. currentProfile,
+      text = L("Actual: %s", currentProfile),
       selected = effectiveSelected == currentProfile,
       onClick = function()
         self:SetAddonProfile(profile, addonName, currentProfile)
@@ -1601,7 +1718,7 @@ function ConfigUI:OpenAddonOptionDropdown(anchor, profile, addonName)
 
   if currentOption then
     table.insert(items, {
-      text = (isCooldownManagerAddon(addonName) and "Diseno actual: " or "Actual: ") .. currentOption,
+      text = isCooldownManagerAddon(addonName) and L("Diseno actual: %s", currentOption) or L("Actual: %s", currentOption),
       selected = effectiveSelected == currentOption,
       onClick = function()
         self:SetAddonOption(profile, addonName, currentOption)
@@ -1637,7 +1754,7 @@ function ConfigUI:OpenAddonOptionDropdown(anchor, profile, addonName)
     end,
   })
 
-  local title = isCooldownManagerAddon(addonName) and (addonName .. " disenos") or (addonName .. " config")
+  local title = isCooldownManagerAddon(addonName) and L("%s disenos", addonName) or L("%s config", addonName)
   self:OpenDropdown(anchor, title, items, 320)
 end
 
@@ -1694,7 +1811,7 @@ function ConfigUI:BuildHelpTab(parent, profile, y)
   profile = profile or {}
   y = self:AddSection(parent, "Ayuda de ModeShift", y)
 
-  local summary = makeText(parent, "Perfil seleccionado: " .. tostring(profile.name or profile.id or "ninguno"), "GameFontHighlight")
+  local summary = makeText(parent, L("Perfil seleccionado: %s", tostring(profile.name or profile.id or L("ninguno"))), "GameFontHighlight")
   summary:SetPoint("TOPLEFT", 4, y)
   summary:SetWidth(560)
   y = y - 30
@@ -1743,7 +1860,7 @@ function ConfigUI:BuildHelpTab(parent, profile, y)
   }
 
   for _, tip in ipairs(tips) do
-    local row = makeText(parent, "- " .. tip)
+    local row = makeText(parent, "- " .. L(tip))
     row:SetPoint("TOPLEFT", 4, y)
     row:SetWidth(650)
     y = y - 22
@@ -1764,7 +1881,7 @@ function ConfigUI:BuildHelpTab(parent, profile, y)
   }
 
   for _, tip in ipairs(cdmTips) do
-    local row = makeText(parent, "- " .. tip)
+    local row = makeText(parent, "- " .. L(tip))
     row:SetPoint("TOPLEFT", 4, y)
     row:SetWidth(650)
     y = y - 22
@@ -1805,7 +1922,7 @@ function ConfigUI:OpenQuickProfileDropdown(anchor)
 
     local profileId = profile.id
     table.insert(items, {
-      text = profile.id == activeProfileId and ((profile.name or profile.id) .. " (actual)") or (profile.name or profile.id),
+      text = profile.id == activeProfileId and L("%s (actual)", profile.name or profile.id) or (profile.name or profile.id),
       selected = profile.id == activeProfileId,
       onClick = function()
         ModeShift.ApplyEngine:ApplyProfile(profileId, { source = "help-quick-menu" })
@@ -2041,7 +2158,11 @@ function ConfigUI:ShowImportExport(title, text, canImport)
     self.importFrame = frame
   end
 
-  self.importFrame.title:SetText(title or "Perfil")
+  self.importFrame.title:SetText(L(title or "Perfil"))
+  setButtonText(self.importFrame.importButton, "Importar")
+  setButtonText(self.importFrame.copyButton, "Copiar todo")
+  setButtonText(self.importFrame.pasteButton, "Pegar")
+  setButtonText(self.importFrame.closeButton, "Cerrar")
   self.importFrame.editBox:SetText(text or "")
   self.importFrame.editBox:SetCursorPosition(0)
   self.importFrame.editBox:SetHeight(300)

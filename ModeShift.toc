@@ -11,6 +11,7 @@
 ## AddonCompartmentFuncOnLeave: ModeShift_OnAddonCompartmentLeave
 
 Core.lua
+Locale.lua
 Constants.lua
 Utils.lua
 Database.lua

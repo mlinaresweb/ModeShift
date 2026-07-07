@@ -2,6 +2,10 @@ local ModeShift = _G.ModeShift
 
 local QuickMenu = {}
 
+local function L(text)
+  return ModeShift.L and ModeShift:L(text) or text
+end
+
 local function addButton(root, text, callback)
   if root.CreateButton then
     root:CreateButton(text, callback)
@@ -19,7 +23,7 @@ local function addTitle(root, text)
 end
 
 local function selectedProfileText(profile)
-  return "|cffff4a35" .. tostring(profile.name or profile.id or "Perfil") .. " (actual)|r"
+  return "|cffff4a35" .. tostring(profile.name or profile.id or L("Perfil")) .. " (" .. L("activo") .. ")|r"
 end
 
 local TYPE_ORDER = {
@@ -130,7 +134,7 @@ function QuickMenu:Open(anchor, options)
   local profiles = self:GetProfiles()
 
   if #profiles == 0 then
-    ModeShift:Print("no hay perfiles. Abre la configuracion y pulsa Nuevo, o usa /ms create si quieres ejemplos.")
+    ModeShift:Print(L("No hay perfiles. Pulsa Nuevo para crear uno."))
     return
   end
 
@@ -176,21 +180,21 @@ function QuickMenu:Open(anchor, options)
       if root.CreateDivider then
         root:CreateDivider()
       end
-      addButton(root, "Reaplicar perfil actual", function()
+      addButton(root, L("Reaplicar perfil actual"), function()
         ModeShift.ApplyEngine:ReapplyCurrentProfile()
       end)
-      addButton(root, "Abrir configuracion", function()
+      addButton(root, L("Abrir configuracion"), function()
         ModeShift:OpenConfig()
       end)
       if ModeShift.Database:GetPendingProfileId() then
-        addButton(root, "Aplicar perfil pendiente", function()
+        addButton(root, L("Aplicar perfil pendiente"), function()
           local pending = ModeShift.Database:GetPendingProfileId()
           ModeShift.Database:SetPendingProfileId(nil)
           ModeShift.ApplyEngine:ApplyProfile(pending, { fromPending = true })
         end)
       end
       if ModeShift.Database:GetRequiresReload() then
-        addButton(root, "Recargar interfaz", function()
+        addButton(root, L("Recargar interfaz"), function()
           ModeShift.Database:SetRequiresReload(false)
           ReloadUI()
         end)
@@ -199,7 +203,7 @@ function QuickMenu:Open(anchor, options)
     return
   end
 
-  ModeShift:Print("menu rapido:")
+  ModeShift:Print(L("Menu rapido") .. ":")
   for _, profile in ipairs(profiles) do
     ModeShift:Print("/ms apply " .. profile.id .. " - " .. (profile.name or profile.id))
   end

@@ -24,5 +24,6 @@ ModeShift.Constants = {
     autoApplyPendingAfterCombat = true,
     showReloadPopup = true,
     debug = false,
+    locale = "auto",
   },
 }

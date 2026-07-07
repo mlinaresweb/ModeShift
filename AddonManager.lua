@@ -55,6 +55,35 @@ local function addUnique(list, value)
   table.insert(list, value)
 end
 
+local function addIconCandidate(list, value)
+  if value == nil or value == "" then
+    return
+  end
+
+  if type(value) == "number" then
+    addUnique(list, value)
+    return
+  end
+
+  if type(value) ~= "string" then
+    return
+  end
+
+  value = value:gsub("^%s+", ""):gsub("%s+$", "")
+  if value == "" then
+    return
+  end
+
+  local numeric = value:match("^%d+$")
+  if numeric then
+    addUnique(list, tonumber(numeric))
+    return
+  end
+
+  value = value:gsub("/", "\\")
+  addUnique(list, value)
+end
+
 local function splitMetadataList(value)
   local list = {}
   if type(value) ~= "string" then
@@ -134,7 +163,7 @@ function AddonManager:GetAddonIcon(addonName)
   for _, key in ipairs({ "IconTexture", "Icon", "X-Icon", "X-IconTexture" }) do
     local icon = getAddOnMetadata(addonName, key)
     if icon and icon ~= "" then
-      addUnique(candidates, icon)
+      addIconCandidate(candidates, icon)
     end
   end
 
@@ -145,7 +174,9 @@ function AddonManager:GetAddonIcon(addonName)
     end
   end
 
-  addUnique(candidates, "Interface\\Icons\\INV_Misc_QuestionMark")
+  addIconCandidate(candidates, 134400)
+  addIconCandidate(candidates, "Interface\\Icons\\INV_Misc_QuestionMark")
+  addIconCandidate(candidates, "Interface\\Icons\\INV_Misc_QuestionMark.blp")
   return candidates
 end
 
