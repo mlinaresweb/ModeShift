@@ -497,6 +497,121 @@ for languageKey, entries in pairs(HELP_EXTRA) do
   end
 end
 
+local UI_EXTRA = {
+  esES = {
+    ["Blizzard no permite cambiar talentos porque hay habilidades en reutilizacion."] = "Blizzard no permite cambiar talentos porque hay habilidades en reutilizacion.",
+    ["Perfil pendiente: %s"] = "Perfil pendiente: %s",
+    ["Bloquea: %s"] = "Bloquea: %s",
+    ["hechizo %s"] = "hechizo %s",
+    ["Esperar %ds"] = "Esperar %ds",
+    ["Continuar perfil"] = "Continuar perfil",
+    ["perfiles internos de addons aplicados: %d"] = "perfiles internos de addons aplicados: %d",
+    ["configs de addons aplicadas: %d"] = "configs de addons aplicadas: %d",
+    ["addons modificados: +%d / -%d; recarga necesaria"] = "addons modificados: +%d / -%d; recarga necesaria",
+    ["%d mensajes mas"] = "%d mensajes mas",
+    ["addons sin perfiles compatibles: %d"] = "addons sin perfiles compatibles: %d",
+    ["perfiles escritos en bases de datos de addons: %d"] = "perfiles escritos en bases de datos de addons: %d",
+    ["%d avisos mas"] = "%d avisos mas",
+  },
+  enUS = {
+    ["Blizzard no permite cambiar talentos porque hay habilidades en reutilizacion."] = "Blizzard cannot change talents while abilities are on cooldown.",
+    ["Perfil pendiente: %s"] = "Pending profile: %s",
+    ["Bloquea: %s"] = "Blocked by: %s",
+    ["hechizo %s"] = "spell %s",
+    ["Esperar %ds"] = "Wait %ds",
+    ["Continuar perfil"] = "Continue profile",
+    ["perfiles internos de addons aplicados: %d"] = "internal addon profiles applied: %d",
+    ["configs de addons aplicadas: %d"] = "addon configs applied: %d",
+    ["addons modificados: +%d / -%d; recarga necesaria"] = "addons changed: +%d / -%d; reload required",
+    ["%d mensajes mas"] = "%d more messages",
+    ["addons sin perfiles compatibles: %d"] = "addons without compatible profiles: %d",
+    ["perfiles escritos en bases de datos de addons: %d"] = "profiles written to addon databases: %d",
+    ["%d avisos mas"] = "%d more warnings",
+  },
+  frFR = {
+    ["Blizzard no permite cambiar talentos porque hay habilidades en reutilizacion."] = "Blizzard ne peut pas changer les talents tant que des techniques sont en recharge.",
+    ["Perfil pendiente: %s"] = "Profil en attente : %s",
+    ["Bloquea: %s"] = "Bloque : %s",
+    ["hechizo %s"] = "sort %s",
+    ["Esperar %ds"] = "Attendre %ds",
+    ["Continuar perfil"] = "Continuer le profil",
+    ["perfiles internos de addons aplicados: %d"] = "profils internes d'addons appliques : %d",
+    ["configs de addons aplicadas: %d"] = "configs d'addons appliquees : %d",
+    ["addons modificados: +%d / -%d; recarga necesaria"] = "addons modifies : +%d / -%d ; rechargement requis",
+    ["%d mensajes mas"] = "%d messages de plus",
+    ["addons sin perfiles compatibles: %d"] = "addons sans profils compatibles : %d",
+    ["perfiles escritos en bases de datos de addons: %d"] = "profils ecrits dans les bases d'addons : %d",
+    ["%d avisos mas"] = "%d avertissements de plus",
+  },
+  deDE = {
+    ["Blizzard no permite cambiar talentos porque hay habilidades en reutilizacion."] = "Blizzard kann Talente nicht wechseln, solange Faehigkeiten Abklingzeit haben.",
+    ["Perfil pendiente: %s"] = "Ausstehendes Profil: %s",
+    ["Bloquea: %s"] = "Blockiert durch: %s",
+    ["hechizo %s"] = "Zauber %s",
+    ["Esperar %ds"] = "%ds warten",
+    ["Continuar perfil"] = "Profil fortsetzen",
+    ["perfiles internos de addons aplicados: %d"] = "interne Addon-Profile angewendet: %d",
+    ["configs de addons aplicadas: %d"] = "Addon-Konfigurationen angewendet: %d",
+    ["addons modificados: +%d / -%d; recarga necesaria"] = "Addons geaendert: +%d / -%d; Neuladen erforderlich",
+    ["%d mensajes mas"] = "%d weitere Meldungen",
+    ["addons sin perfiles compatibles: %d"] = "Addons ohne kompatible Profile: %d",
+    ["perfiles escritos en bases de datos de addons: %d"] = "Profile in Addon-Datenbanken geschrieben: %d",
+    ["%d avisos mas"] = "%d weitere Warnungen",
+  },
+  ruRU = {
+    ["Blizzard no permite cambiar talentos porque hay habilidades en reutilizacion."] = "Blizzard не может сменить таланты, пока умения восстанавливаются.",
+    ["Perfil pendiente: %s"] = "Ожидающий профиль: %s",
+    ["Bloquea: %s"] = "Блокирует: %s",
+    ["hechizo %s"] = "заклинание %s",
+    ["Esperar %ds"] = "Ждать %dс",
+    ["Continuar perfil"] = "Продолжить профиль",
+    ["perfiles internos de addons aplicados: %d"] = "применено внутренних профилей аддонов: %d",
+    ["configs de addons aplicadas: %d"] = "применено настроек аддонов: %d",
+    ["addons modificados: +%d / -%d; recarga necesaria"] = "аддоны изменены: +%d / -%d; нужна перезагрузка",
+    ["%d mensajes mas"] = "еще сообщений: %d",
+    ["addons sin perfiles compatibles: %d"] = "аддоны без совместимых профилей: %d",
+    ["perfiles escritos en bases de datos de addons: %d"] = "профили записаны в базы аддонов: %d",
+    ["%d avisos mas"] = "еще предупреждений: %d",
+  },
+  itIT = {
+    ["Blizzard no permite cambiar talentos porque hay habilidades en reutilizacion."] = "Blizzard non puo cambiare talenti mentre alcune abilita sono in recupero.",
+    ["Perfil pendiente: %s"] = "Profilo in attesa: %s",
+    ["Bloquea: %s"] = "Bloccato da: %s",
+    ["hechizo %s"] = "incantesimo %s",
+    ["Esperar %ds"] = "Attendi %ds",
+    ["Continuar perfil"] = "Continua profilo",
+    ["perfiles internos de addons aplicados: %d"] = "profili interni addon applicati: %d",
+    ["configs de addons aplicadas: %d"] = "config addon applicate: %d",
+    ["addons modificados: +%d / -%d; recarga necesaria"] = "addon modificati: +%d / -%d; reload richiesto",
+    ["%d mensajes mas"] = "%d altri messaggi",
+    ["addons sin perfiles compatibles: %d"] = "addon senza profili compatibili: %d",
+    ["perfiles escritos en bases de datos de addons: %d"] = "profili scritti nei database addon: %d",
+    ["%d avisos mas"] = "%d altri avvisi",
+  },
+  ptBR = {
+    ["Blizzard no permite cambiar talentos porque hay habilidades en reutilizacion."] = "A Blizzard nao permite trocar talentos enquanto habilidades estao em recarga.",
+    ["Perfil pendiente: %s"] = "Perfil pendente: %s",
+    ["Bloquea: %s"] = "Bloqueia: %s",
+    ["hechizo %s"] = "feitico %s",
+    ["Esperar %ds"] = "Aguardar %ds",
+    ["Continuar perfil"] = "Continuar perfil",
+    ["perfiles internos de addons aplicados: %d"] = "perfis internos de addons aplicados: %d",
+    ["configs de addons aplicadas: %d"] = "configs de addons aplicadas: %d",
+    ["addons modificados: +%d / -%d; recarga necesaria"] = "addons alterados: +%d / -%d; recarga necessaria",
+    ["%d mensajes mas"] = "%d mensagens a mais",
+    ["addons sin perfiles compatibles: %d"] = "addons sem perfis compativeis: %d",
+    ["perfiles escritos en bases de datos de addons: %d"] = "perfis gravados nos bancos de addons: %d",
+    ["%d avisos mas"] = "%d avisos a mais",
+  },
+}
+
+for languageKey, entries in pairs(UI_EXTRA) do
+  T[languageKey] = T[languageKey] or {}
+  for key, value in pairs(entries) do
+    T[languageKey][key] = value
+  end
+end
+
 Locale.translations = T
 
 function ModeShift:GetLanguageKey()

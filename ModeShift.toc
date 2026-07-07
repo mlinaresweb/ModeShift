@@ -5,7 +5,7 @@
 ## Version: 0.1.0
 ## SavedVariables: ModeShiftDB
 ## SavedVariablesPerCharacter: ModeShiftCharDB
-## IconTexture: Interface\Icons\INV_Misc_Gear_01
+## IconTexture: Interface\AddOns\ModeShift\Media\ModeShiftIcon
 ## AddonCompartmentFunc: ModeShift_OnAddonCompartmentClick
 ## AddonCompartmentFuncOnEnter: ModeShift_OnAddonCompartmentEnter
 ## AddonCompartmentFuncOnLeave: ModeShift_OnAddonCompartmentLeave

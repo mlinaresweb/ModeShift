@@ -14,7 +14,7 @@ ModeShift.Constants = {
     CUSTOM = "CUSTOM",
   },
 
-  DEFAULT_ICON = "Interface\\Icons\\INV_Misc_Gear_01",
+  DEFAULT_ICON = "Interface\\AddOns\\ModeShift\\Media\\ModeShiftIcon",
 
   DEFAULT_SETTINGS = {
     minimapButton = true,

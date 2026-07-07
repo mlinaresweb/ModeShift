@@ -2,6 +2,29 @@ local ModeShift = _G.ModeShift
 
 local ApplyEngine = {}
 
+local function L(text, ...)
+  if ModeShift and ModeShift.L then
+    return ModeShift:L(text, ...)
+  end
+  if select("#", ...) > 0 then
+    return string.format(text, ...)
+  end
+  return text
+end
+
+local function countAddonDelta(message)
+  local enabled = 0
+  local disabled = 0
+  for token in tostring(message or ""):gmatch("([%+%-])[^,%s]+") do
+    if token == "+" then
+      enabled = enabled + 1
+    elseif token == "-" then
+      disabled = disabled + 1
+    end
+  end
+  return enabled, disabled
+end
+
 local function appendAll(target, source)
   if type(target) ~= "table" or type(source) ~= "table" then
     return
@@ -249,7 +272,7 @@ function ApplyEngine:ShowCooldownWaitPopup(profileId, delay, reason, token, opti
 
   if not self.cooldownWaitFrame then
     local frame = CreateFrame("Frame", "ModeShiftCooldownWaitFrame", UIParent, "BasicFrameTemplateWithInset")
-    frame:SetSize(420, 150)
+    frame:SetSize(440, 176)
     frame:SetPoint("CENTER", UIParent, "CENTER", 0, 120)
     frame:SetFrameStrata("DIALOG")
     frame:SetFrameLevel(8000)
@@ -260,23 +283,31 @@ function ApplyEngine:ShowCooldownWaitPopup(profileId, delay, reason, token, opti
     frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
 
     frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    frame.title:SetPoint("TOPLEFT", 14, -8)
+    frame.title:SetPoint("TOPLEFT", 16, -8)
     frame.title:SetText("ModeShift")
 
     frame.message = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    frame.message:SetPoint("TOPLEFT", 18, -38)
-    frame.message:SetWidth(380)
+    frame.message:SetPoint("TOPLEFT", 22, -40)
+    frame.message:SetPoint("RIGHT", frame, "RIGHT", -22, 0)
+    frame.message:SetHeight(82)
     frame.message:SetJustifyH("LEFT")
     frame.message:SetJustifyV("TOP")
 
     frame.button = CreateFrame("Button", nil, frame, "UIPanelButtonTemplate")
-    frame.button:SetSize(180, 26)
-    frame.button:SetPoint("BOTTOM", frame, "BOTTOM", 0, 18)
+    frame.button:SetSize(190, 26)
+    frame.button:SetPoint("BOTTOM", frame, "BOTTOM", 0, 20)
     frame.button:SetScript("OnClick", function()
       if ModeShift.ApplyEngine then
         ModeShift.ApplyEngine:ContinueCooldownRetry()
       end
     end)
+
+    frame.divider = frame:CreateTexture(nil, "BORDER")
+    frame.divider:SetColorTexture(1, 0.82, 0, 0.35)
+    frame.divider:SetHeight(1)
+    frame.divider:SetPoint("LEFT", frame, "LEFT", 22, 0)
+    frame.divider:SetPoint("RIGHT", frame, "RIGHT", -22, 0)
+    frame.divider:SetPoint("BOTTOM", frame.button, "TOP", 0, 12)
 
     frame:SetScript("OnHide", function(self)
       self:SetScript("OnUpdate", nil)
@@ -304,11 +335,14 @@ function ApplyEngine:ShowCooldownWaitPopup(profileId, delay, reason, token, opti
   if spellText and cooldownInfo and cooldownInfo.spellId then
     spellText = spellText .. " (" .. tostring(cooldownInfo.spellId) .. ")"
   elseif cooldownInfo and cooldownInfo.spellId then
-    spellText = "hechizo " .. tostring(cooldownInfo.spellId)
+    spellText = L("hechizo %s", tostring(cooldownInfo.spellId))
   elseif cooldownInfo and cooldownInfo.spellIds and cooldownInfo.spellIds[1] then
-    spellText = "hechizo " .. tostring(cooldownInfo.spellIds[1])
+    spellText = L("hechizo %s", tostring(cooldownInfo.spellIds[1]))
+  elseif cooldownInfo and cooldownInfo.actionSlot then
+    spellText = L("hechizo %s", tostring(cooldownInfo.actionSlot))
   end
-  frame.message:SetText("Blizzard no permite cambiar talentos porque hay habilidades en cooldown.\nPerfil pendiente: " .. profileName .. "\nBloquea: " .. spellText)
+  spellText = spellText or L("hechizo %s", "?")
+  frame.message:SetText(L("Blizzard no permite cambiar talentos porque hay habilidades en reutilizacion.") .. "\n" .. L("Perfil pendiente: %s", profileName) .. "\n" .. L("Bloquea: %s", spellText))
   frame:Show()
 
   frame:SetScript("OnUpdate", function(self)
@@ -330,18 +364,20 @@ function ApplyEngine:ShowCooldownWaitPopup(profileId, delay, reason, token, opti
     if blockerText and blocker and blocker.spellId then
       blockerText = blockerText .. " (" .. tostring(blocker.spellId) .. ")"
     elseif blocker and blocker.spellId then
-      blockerText = "hechizo " .. tostring(blocker.spellId)
+      blockerText = L("hechizo %s", tostring(blocker.spellId))
     elseif blocker and blocker.spellIds and blocker.spellIds[1] then
-      blockerText = "hechizo " .. tostring(blocker.spellIds[1])
+      blockerText = L("hechizo %s", tostring(blocker.spellIds[1]))
+    elseif blocker and blocker.actionSlot then
+      blockerText = L("hechizo %s", tostring(blocker.actionSlot))
     end
-    self.message:SetText("Blizzard no permite cambiar talentos porque hay habilidades en cooldown.\nPerfil pendiente: " .. tostring(wait.profileName or wait.profileId) .. "\nBloquea: " .. blockerText)
+    blockerText = blockerText or L("hechizo %s", "?")
+    self.message:SetText(L("Blizzard no permite cambiar talentos porque hay habilidades en reutilizacion.") .. "\n" .. L("Perfil pendiente: %s", tostring(wait.profileName or wait.profileId)) .. "\n" .. L("Bloquea: %s", blockerText))
     if remaining > 0 then
       self.button:Disable()
-      self.button:SetText("Esperar " .. tostring(remaining) .. "s")
+      self.button:SetText(L("Esperar %ds", remaining))
     else
       self.button:Enable()
-      local exact = blocker and blocker.exact and (blocker.spellId or blocker.actionSlot or blocker.spellName or (blocker.spellIds and #blocker.spellIds > 0))
-      self.button:SetText(exact and "Continuar perfil" or "Continuar perfil")
+      self.button:SetText(L("Continuar perfil"))
     end
   end)
 end
@@ -697,12 +733,67 @@ function ApplyEngine:ReapplyCurrentProfile()
 end
 
 function ApplyEngine:PrintSummary(result)
+  local profileApplied = 0
+  local configApplied = 0
+  local addonEnabled = 0
+  local addonDisabled = 0
+  local printedApplied = 0
   for _, message in ipairs(result.applied) do
-    ModeShift:Print("|cff55ff55OK|r " .. message)
+    local text = tostring(message or "")
+    if text:find("^Perfil ") then
+      profileApplied = profileApplied + 1
+    elseif text:find("^Config ") then
+      configApplied = configApplied + 1
+    elseif text:find("^Addons modificados:") then
+      local enabled, disabled = countAddonDelta(text)
+      addonEnabled = addonEnabled + enabled
+      addonDisabled = addonDisabled + disabled
+    else
+      printedApplied = printedApplied + 1
+      if printedApplied <= 6 then
+        ModeShift:Print("|cff55ff55OK|r " .. text)
+      end
+    end
   end
 
+  if profileApplied > 0 then
+    ModeShift:Print("|cff55ff55OK|r " .. L("perfiles internos de addons aplicados: %d", profileApplied))
+  end
+  if configApplied > 0 then
+    ModeShift:Print("|cff55ff55OK|r " .. L("configs de addons aplicadas: %d", configApplied))
+  end
+  if addonEnabled > 0 or addonDisabled > 0 then
+    ModeShift:Print("|cff55ff55OK|r " .. L("addons modificados: +%d / -%d; recarga necesaria", addonEnabled, addonDisabled))
+  end
+  if printedApplied > 6 then
+    ModeShift:Print("|cff999999...|r " .. L("%d mensajes mas", printedApplied - 6))
+  end
+
+  local compatWarnings = 0
+  local writtenWarnings = 0
+  local printedWarnings = 0
   for _, message in ipairs(result.warnings) do
-    ModeShift:Print("|cffffff66!|r " .. message)
+    local text = tostring(message or "")
+    if text:find("No encuentro perfiles compatibles", 1, true) then
+      compatWarnings = compatWarnings + 1
+    elseif text:find("Perfil escrito en", 1, true) then
+      writtenWarnings = writtenWarnings + 1
+    else
+      printedWarnings = printedWarnings + 1
+      if printedWarnings <= 6 then
+        ModeShift:Print("|cffffff66!|r " .. text)
+      end
+    end
+  end
+
+  if compatWarnings > 0 then
+    ModeShift:Print("|cffffff66!|r " .. L("addons sin perfiles compatibles: %d", compatWarnings))
+  end
+  if writtenWarnings > 0 then
+    ModeShift:Print("|cffffff66!|r " .. L("perfiles escritos en bases de datos de addons: %d", writtenWarnings))
+  end
+  if printedWarnings > 6 then
+    ModeShift:Print("|cff999999...|r " .. L("%d avisos mas", printedWarnings - 6))
   end
 
   for _, message in ipairs(result.errors) do

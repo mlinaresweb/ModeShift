@@ -22,7 +22,7 @@ end
 
 local function updatePosition(button)
   local angle = math.rad(getAngle())
-  local radius = ((Minimap:GetWidth() or 140) / 2) + 6
+  local radius = ((Minimap:GetWidth() or 140) / 2) + 4
   local x = math.cos(angle) * radius
   local y = math.sin(angle) * radius
   button:ClearAllPoints()
@@ -75,7 +75,7 @@ function MinimapModule:Initialize()
   end
 
   local button = CreateFrame("Button", "ModeShiftMinimapButton", Minimap)
-  button:SetSize(32, 32)
+  button:SetSize(31, 31)
   button:SetFrameStrata("HIGH")
   button:SetFrameLevel((Minimap:GetFrameLevel() or 0) + 8)
   updatePosition(button)
@@ -121,28 +121,23 @@ function MinimapModule:Initialize()
     GameTooltip:Hide()
   end)
 
-  button.iconBg = button:CreateTexture(nil, "BACKGROUND")
-  button.iconBg:SetTexture("Interface\\Minimap\\UI-Minimap-Background")
-  button.iconBg:SetSize(24, 24)
-  button.iconBg:SetPoint("CENTER", button, "CENTER", 0, 0)
-
   button.icon = button:CreateTexture(nil, "ARTWORK")
   button.icon:SetTexture(ModeShift.Constants.DEFAULT_ICON)
-  button.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-  button.icon:SetSize(18, 18)
-  button.icon:SetPoint("CENTER", button, "CENTER", 0, 0)
+  button.icon:SetTexCoord(0, 1, 0, 1)
+  button.icon:SetSize(20, 20)
+  button.icon:SetPoint("TOPLEFT", button, "TOPLEFT", 7, -6)
   if button.CreateMaskTexture and button.icon.AddMaskTexture then
     button.iconMask = button:CreateMaskTexture()
     button.iconMask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
-    button.iconMask:SetSize(18, 18)
-    button.iconMask:SetPoint("CENTER", button, "CENTER", 0, 0)
+    button.iconMask:SetSize(20, 20)
+    button.iconMask:SetPoint("TOPLEFT", button, "TOPLEFT", 7, -6)
     button.icon:AddMaskTexture(button.iconMask)
   end
 
   button.border = button:CreateTexture(nil, "OVERLAY")
   button.border:SetTexture("Interface\\Minimap\\MiniMap-TrackingBorder")
-  button.border:SetSize(38, 38)
-  button.border:SetPoint("CENTER", button, "CENTER", 0, 0)
+  button.border:SetSize(53, 53)
+  button.border:SetPoint("TOPLEFT", button, "TOPLEFT", 0, 0)
 
   self.button = button
 end
