@@ -107,6 +107,46 @@ function ModeShift:GetCurrentSpecName()
   return nil
 end
 
+function ModeShift:GetSpecNameById(specId)
+  specId = tonumber(specId)
+  if not specId then
+    return nil
+  end
+
+  if GetNumSpecializations and GetSpecializationInfo then
+    local count = GetNumSpecializations()
+    for index = 1, count do
+      local currentSpecId, specName = GetSpecializationInfo(index)
+      if currentSpecId == specId then
+        return specName
+      end
+    end
+  end
+
+  if C_SpecializationInfo and C_SpecializationInfo.GetNumSpecializationsForClassID and C_SpecializationInfo.GetSpecializationInfoForClassID then
+    local classId
+    if UnitClassBase then
+      local ok, _, _, id = self:SafeCall("UnitClassBase", UnitClassBase, "player")
+      if ok then
+        classId = id
+      end
+    end
+    if classId then
+      local ok, count = self:SafeCall("GetNumSpecializationsForClassID", C_SpecializationInfo.GetNumSpecializationsForClassID, classId)
+      if ok and count then
+        for index = 1, count do
+          local infoOk, currentSpecId, specName = self:SafeCall("GetSpecializationInfoForClassID", C_SpecializationInfo.GetSpecializationInfoForClassID, classId, index)
+          if infoOk and currentSpecId == specId then
+            return specName
+          end
+        end
+      end
+    end
+  end
+
+  return nil
+end
+
 function ModeShift:GetClassFile()
   if not UnitClass then
     return nil
@@ -162,21 +202,39 @@ function ModeShift:OpenConfig()
   end
 
   if not self.ConfigFrame then
-    local f = CreateFrame("Frame", "ModeShiftConfigFrame", UIParent, "BasicFrameTemplateWithInset")
+    local f = CreateFrame("Frame", "ModeShiftConfigFrame", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
     f:SetSize(560, 420)
     f:SetPoint("CENTER")
+    if f.SetBackdrop then
+      f:SetBackdrop({
+        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true,
+        tileSize = 32,
+        edgeSize = 24,
+        insets = { left = 6, right = 6, top = 6, bottom = 6 },
+      })
+      f:SetBackdropColor(0.025, 0.025, 0.025, 0.96)
+      f:SetBackdropBorderColor(0.75, 0.08, 0.04, 1)
+    end
     f:SetMovable(true)
     f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", f.StartMoving)
     f:SetScript("OnDragStop", f.StopMovingOrSizing)
 
+    f.closeButton = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+    f.closeButton:SetPoint("TOPRIGHT", f, "TOPRIGHT", -2, -2)
+    f.closeButton:SetScript("OnClick", function()
+      f:Hide()
+    end)
+
     f.title = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    f.title:SetPoint("LEFT", f.TitleBg or f, "LEFT", 8, 0)
+    f.title:SetPoint("TOPLEFT", 18, -14)
     f.title:SetText("ModeShift")
 
     f.subtitle = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    f.subtitle:SetPoint("TOPLEFT", 16, -38)
+    f.subtitle:SetPoint("TOPLEFT", 16, -52)
     f.subtitle:SetText("Perfiles disponibles")
 
     f.body = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")

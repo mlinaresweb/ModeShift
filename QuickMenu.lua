@@ -6,19 +6,21 @@ local function L(text)
   return ModeShift.L and ModeShift:L(text) or text
 end
 
-local function addButton(root, text, callback)
+local function addButton(root, text, callback, rawText)
+  local label = rawText and text or L(text)
   if root.CreateButton then
-    root:CreateButton(text, callback)
+    root:CreateButton(label, callback)
   elseif root.CreateTitle then
-    root:CreateTitle(text)
+    root:CreateTitle(label)
   end
 end
 
-local function addTitle(root, text)
+local function addTitle(root, text, rawText)
+  local label = rawText and text or L(text)
   if root.CreateTitle then
-    root:CreateTitle(text)
+    root:CreateTitle(label)
   elseif root.CreateButton then
-    root:CreateButton(text, function() end)
+    root:CreateButton(label, function() end)
   end
 end
 
@@ -93,7 +95,7 @@ local function addProfileButton(root, profile, activeProfileId)
   local name = profile.id == activeProfileId and selectedProfileText(profile) or (profile.name or profile.id)
   addButton(root, name, function()
     ModeShift.ApplyEngine:ApplyProfile(profileValue.id, { source = "quick-menu" })
-  end)
+  end, true)
 end
 
 local function addTypedProfileGroups(root, profiles, activeProfileId)
@@ -103,7 +105,7 @@ local function addTypedProfileGroups(root, profiles, activeProfileId)
     if index > 1 and root.CreateDivider then
       root:CreateDivider()
     end
-    addTitle(root, modeTypeLabel(typeGroup.modeType))
+    addTitle(root, modeTypeLabel(typeGroup.modeType), true)
     for _, profile in ipairs(typeGroup.profiles) do
       addProfileButton(root, profile, activeProfileId)
     end
@@ -180,21 +182,21 @@ function QuickMenu:Open(anchor, options)
       if root.CreateDivider then
         root:CreateDivider()
       end
-      addButton(root, L("Reaplicar perfil actual"), function()
+      addButton(root, "Reaplicar perfil actual", function()
         ModeShift.ApplyEngine:ReapplyCurrentProfile()
       end)
-      addButton(root, L("Abrir configuracion"), function()
+      addButton(root, "Abrir configuracion", function()
         ModeShift:OpenConfig()
       end)
       if ModeShift.Database:GetPendingProfileId() then
-        addButton(root, L("Aplicar perfil pendiente"), function()
+        addButton(root, "Aplicar perfil pendiente", function()
           local pending = ModeShift.Database:GetPendingProfileId()
           ModeShift.Database:SetPendingProfileId(nil)
           ModeShift.ApplyEngine:ApplyProfile(pending, { fromPending = true })
         end)
       end
       if ModeShift.Database:GetRequiresReload() then
-        addButton(root, L("Recargar interfaz"), function()
+        addButton(root, "Recargar interfaz", function()
           ModeShift.Database:SetRequiresReload(false)
           ReloadUI()
         end)

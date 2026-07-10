@@ -512,7 +512,9 @@ function ApplyEngine:ScheduleProfileRetry(profileId, delay, reason, options)
     return
   end
 
-  ModeShift:Print("esperando para continuar " .. tostring(profile and (profile.name or profile.id) or profileId) .. " en " .. string.format("%.1f", delay) .. "s.")
+  if not (options and options.quietRetry) then
+    ModeShift:Print("esperando para continuar " .. tostring(profile and (profile.name or profile.id) or profileId) .. " en " .. string.format("%.1f", delay) .. "s.")
+  end
 
   C_Timer.After(delay, function()
     if token ~= self.retryToken or self.retryProfileId ~= profileId then
@@ -614,7 +616,22 @@ function ApplyEngine:ApplyProfile(profileId, options)
     end
   end
 
-  if ModeShift.TalentManager and ModeShift.TalentManager.GetBlockingCooldownForProfile then
+  if options.skipTalents
+    and ModeShift.TalentManager
+    and ((ModeShift.TalentManager.IsCommitPending and ModeShift.TalentManager:IsCommitPending())
+      or (ModeShift.TalentManager.IsPlayerCastingOrChanneling and ModeShift.TalentManager:IsPlayerCastingOrChanneling()))
+  then
+    result.pendingRetry = true
+    result.retryReason = "post-talent-work"
+    local retryOptions = ModeShift.Utils:DeepCopy(options or {})
+    retryOptions.skipTalents = true
+    retryOptions.waitingAfterTalents = true
+    retryOptions.quietRetry = true
+    self:ScheduleProfileRetry(profile.id, 0.45, "post-talent-work", retryOptions)
+    return result
+  end
+
+  if not options.skipTalents and ModeShift.TalentManager and ModeShift.TalentManager.GetBlockingCooldownForProfile then
     local cooldownInfo, loadout = ModeShift.TalentManager:GetBlockingCooldownForProfile(profile)
     if cooldownInfo and cooldownInfo.remaining and cooldownInfo.remaining > 0 then
       result.success = false
@@ -636,7 +653,7 @@ function ApplyEngine:ApplyProfile(profileId, options)
 
   ModeShift:Print("aplicando perfil " .. (profile.name or profile.id) .. "...")
 
-  if ModeShift.TalentManager then
+  if not options.skipTalents and ModeShift.TalentManager then
     local talentResult = ModeShift.TalentManager:Apply(profile)
     talentsChanged = hasAppliedWork(talentResult)
     self:MergeResult(result, talentResult)
@@ -659,6 +676,23 @@ function ApplyEngine:ApplyProfile(profileId, options)
       end
       return result
     end
+  end
+
+  if talentsChanged and C_Timer and C_Timer.After then
+    result.pendingRetry = true
+    result.retryReason = "post-talent-work"
+    table.insert(result.skipped, "Equipo/UI/addons esperan a que Blizzard termine el cambio de talentos")
+    self:PrintSummary(result)
+    local retryOptions = ModeShift.Utils:DeepCopy(options or {})
+    retryOptions.skipTalents = true
+    retryOptions.waitingAfterTalents = true
+    retryOptions.quietRetry = true
+    retryOptions.retryAttempts = self.retryAttempts or 0
+    self:ScheduleProfileRetry(profile.id, 0.65, "post-talent-work", retryOptions)
+    if ModeShift.RefreshConfig then
+      ModeShift:RefreshConfig()
+    end
+    return result
   end
 
   if ModeShift.EquipmentManager then

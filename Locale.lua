@@ -307,6 +307,10 @@ local EXTRA = {
     ["Ayuda de ModeShift"] = "Ayuda de ModeShift",
     ["Perfil seleccionado: %s"] = "Perfil seleccionado: %s",
     ["Menu rapido"] = "Menú rápido",
+    ["Reaplicar perfil actual"] = "Reaplicar perfil actual",
+    ["Abrir configuracion"] = "Abrir configuracion",
+    ["Reapply current profile"] = "Reaplicar perfil actual",
+    ["Open configuration"] = "Abrir configuracion",
     ["Opciones de AddOns"] = "Opciones de AddOns",
     ["Comandos"] = "Comandos",
     ["Flujo recomendado"] = "Flujo recomendado",
@@ -499,6 +503,13 @@ end
 
 local UI_EXTRA = {
   esES = {
+    ["Apoya ModeShift"] = "Apoya ModeShift",
+    ["ModeShift se mantiene con tiempo y pruebas. Si te ayuda y quieres apoyar el desarrollo, puedes donar voluntariamente."] = "ModeShift se mantiene con tiempo y pruebas. Si te ayuda y quieres apoyar el desarrollo, puedes donar voluntariamente.",
+    ["Abrir PayPal"] = "Abrir PayPal",
+    ["Copiar enlace"] = "Copiar enlace",
+    ["WoW no ha permitido abrir el navegador automaticamente. Copia el enlace y pegalo en tu navegador."] = "WoW no ha permitido abrir el navegador automaticamente. Copia el enlace y pegalo en tu navegador.",
+    ["enlace de donacion copiado al portapapeles."] = "enlace de donacion copiado al portapapeles.",
+    ["enlace seleccionado. Pulsa Ctrl+C para copiarlo."] = "enlace seleccionado. Pulsa Ctrl+C para copiarlo.",
     ["Blizzard no permite cambiar talentos porque hay habilidades en reutilizacion."] = "Blizzard no permite cambiar talentos porque hay habilidades en reutilizacion.",
     ["Perfil pendiente: %s"] = "Perfil pendiente: %s",
     ["Bloquea: %s"] = "Bloquea: %s",
@@ -514,6 +525,13 @@ local UI_EXTRA = {
     ["%d avisos mas"] = "%d avisos mas",
   },
   enUS = {
+    ["Apoya ModeShift"] = "Support ModeShift",
+    ["ModeShift se mantiene con tiempo y pruebas. Si te ayuda y quieres apoyar el desarrollo, puedes donar voluntariamente."] = "ModeShift takes time and testing to maintain. If it helps you and you want to support development, donations are optional and appreciated.",
+    ["Abrir PayPal"] = "Open PayPal",
+    ["Copiar enlace"] = "Copy link",
+    ["WoW no ha permitido abrir el navegador automaticamente. Copia el enlace y pegalo en tu navegador."] = "WoW could not open the browser automatically. Copy the link and paste it into your browser.",
+    ["enlace de donacion copiado al portapapeles."] = "donation link copied to the clipboard.",
+    ["enlace seleccionado. Pulsa Ctrl+C para copiarlo."] = "link selected. Press Ctrl+C to copy it.",
     ["Blizzard no permite cambiar talentos porque hay habilidades en reutilizacion."] = "Blizzard cannot change talents while abilities are on cooldown.",
     ["Perfil pendiente: %s"] = "Pending profile: %s",
     ["Bloquea: %s"] = "Blocked by: %s",
@@ -529,6 +547,13 @@ local UI_EXTRA = {
     ["%d avisos mas"] = "%d more warnings",
   },
   frFR = {
+    ["Apoya ModeShift"] = "Soutenir ModeShift",
+    ["ModeShift se mantiene con tiempo y pruebas. Si te ayuda y quieres apoyar el desarrollo, puedes donar voluntariamente."] = "ModeShift demande du temps et des tests. Si l'addon t'aide et que tu veux soutenir le developpement, les dons sont facultatifs.",
+    ["Abrir PayPal"] = "Ouvrir PayPal",
+    ["Copiar enlace"] = "Copier le lien",
+    ["WoW no ha permitido abrir el navegador automaticamente. Copia el enlace y pegalo en tu navegador."] = "WoW n'a pas pu ouvrir le navigateur automatiquement. Copie le lien et colle-le dans ton navigateur.",
+    ["enlace de donacion copiado al portapapeles."] = "lien de don copie dans le presse-papiers.",
+    ["enlace seleccionado. Pulsa Ctrl+C para copiarlo."] = "lien selectionne. Appuie sur Ctrl+C pour le copier.",
     ["Blizzard no permite cambiar talentos porque hay habilidades en reutilizacion."] = "Blizzard ne peut pas changer les talents tant que des techniques sont en recharge.",
     ["Perfil pendiente: %s"] = "Profil en attente : %s",
     ["Bloquea: %s"] = "Bloque : %s",
@@ -544,6 +569,13 @@ local UI_EXTRA = {
     ["%d avisos mas"] = "%d avertissements de plus",
   },
   deDE = {
+    ["Apoya ModeShift"] = "ModeShift unterstuetzen",
+    ["ModeShift se mantiene con tiempo y pruebas. Si te ayuda y quieres apoyar el desarrollo, puedes donar voluntariamente."] = "ModeShift braucht Zeit und Tests. Wenn es dir hilft und du die Entwicklung unterstuetzen moechtest, sind Spenden freiwillig.",
+    ["Abrir PayPal"] = "PayPal oeffnen",
+    ["Copiar enlace"] = "Link kopieren",
+    ["WoW no ha permitido abrir el navegador automaticamente. Copia el enlace y pegalo en tu navegador."] = "WoW konnte den Browser nicht automatisch oeffnen. Kopiere den Link und fuege ihn in deinen Browser ein.",
+    ["enlace de donacion copiado al portapapeles."] = "Spendenlink in die Zwischenablage kopiert.",
+    ["enlace seleccionado. Pulsa Ctrl+C para copiarlo."] = "Link markiert. Druecke Strg+C zum Kopieren.",
     ["Blizzard no permite cambiar talentos porque hay habilidades en reutilizacion."] = "Blizzard kann Talente nicht wechseln, solange Faehigkeiten Abklingzeit haben.",
     ["Perfil pendiente: %s"] = "Ausstehendes Profil: %s",
     ["Bloquea: %s"] = "Blockiert durch: %s",
@@ -559,6 +591,13 @@ local UI_EXTRA = {
     ["%d avisos mas"] = "%d weitere Warnungen",
   },
   ruRU = {
+    ["Apoya ModeShift"] = "Поддержать ModeShift",
+    ["ModeShift se mantiene con tiempo y pruebas. Si te ayuda y quieres apoyar el desarrollo, puedes donar voluntariamente."] = "Поддержка ModeShift требует времени и тестов. Если аддон помогает тебе и ты хочешь поддержать разработку, донат полностью добровольный.",
+    ["Abrir PayPal"] = "Открыть PayPal",
+    ["Copiar enlace"] = "Скопировать ссылку",
+    ["WoW no ha permitido abrir el navegador automaticamente. Copia el enlace y pegalo en tu navegador."] = "WoW не смог автоматически открыть браузер. Скопируй ссылку и вставь ее в браузер.",
+    ["enlace de donacion copiado al portapapeles."] = "ссылка для доната скопирована в буфер обмена.",
+    ["enlace seleccionado. Pulsa Ctrl+C para copiarlo."] = "ссылка выделена. Нажми Ctrl+C, чтобы скопировать.",
     ["Blizzard no permite cambiar talentos porque hay habilidades en reutilizacion."] = "Blizzard не может сменить таланты, пока умения восстанавливаются.",
     ["Perfil pendiente: %s"] = "Ожидающий профиль: %s",
     ["Bloquea: %s"] = "Блокирует: %s",
@@ -574,6 +613,13 @@ local UI_EXTRA = {
     ["%d avisos mas"] = "еще предупреждений: %d",
   },
   itIT = {
+    ["Apoya ModeShift"] = "Sostieni ModeShift",
+    ["ModeShift se mantiene con tiempo y pruebas. Si te ayuda y quieres apoyar el desarrollo, puedes donar voluntariamente."] = "ModeShift richiede tempo e test. Se ti aiuta e vuoi sostenere lo sviluppo, le donazioni sono facoltative.",
+    ["Abrir PayPal"] = "Apri PayPal",
+    ["Copiar enlace"] = "Copia link",
+    ["WoW no ha permitido abrir el navegador automaticamente. Copia el enlace y pegalo en tu navegador."] = "WoW non ha potuto aprire automaticamente il browser. Copia il link e incollalo nel browser.",
+    ["enlace de donacion copiado al portapapeles."] = "link donazione copiato negli appunti.",
+    ["enlace seleccionado. Pulsa Ctrl+C para copiarlo."] = "link selezionato. Premi Ctrl+C per copiarlo.",
     ["Blizzard no permite cambiar talentos porque hay habilidades en reutilizacion."] = "Blizzard non puo cambiare talenti mentre alcune abilita sono in recupero.",
     ["Perfil pendiente: %s"] = "Profilo in attesa: %s",
     ["Bloquea: %s"] = "Bloccato da: %s",
@@ -589,6 +635,13 @@ local UI_EXTRA = {
     ["%d avisos mas"] = "%d altri avvisi",
   },
   ptBR = {
+    ["Apoya ModeShift"] = "Apoiar ModeShift",
+    ["ModeShift se mantiene con tiempo y pruebas. Si te ayuda y quieres apoyar el desarrollo, puedes donar voluntariamente."] = "ModeShift leva tempo e testes para manter. Se ele te ajuda e voce quer apoiar o desenvolvimento, doacoes sao opcionais.",
+    ["Abrir PayPal"] = "Abrir PayPal",
+    ["Copiar enlace"] = "Copiar link",
+    ["WoW no ha permitido abrir el navegador automaticamente. Copia el enlace y pegalo en tu navegador."] = "WoW nao conseguiu abrir o navegador automaticamente. Copie o link e cole no seu navegador.",
+    ["enlace de donacion copiado al portapapeles."] = "link de doacao copiado para a area de transferencia.",
+    ["enlace seleccionado. Pulsa Ctrl+C para copiarlo."] = "link selecionado. Pressione Ctrl+C para copiar.",
     ["Blizzard no permite cambiar talentos porque hay habilidades en reutilizacion."] = "A Blizzard nao permite trocar talentos enquanto habilidades estao em recarga.",
     ["Perfil pendiente: %s"] = "Perfil pendente: %s",
     ["Bloquea: %s"] = "Bloqueia: %s",
@@ -606,6 +659,51 @@ local UI_EXTRA = {
 }
 
 for languageKey, entries in pairs(UI_EXTRA) do
+  T[languageKey] = T[languageKey] or {}
+  for key, value in pairs(entries) do
+    T[languageKey][key] = value
+  end
+end
+
+local TALENT_SPEC_EXTRA = {
+  esES = {
+    ["Selecciona una configuracion de talentos de la spec asignada al perfil. Puedes preparar perfiles de otras specs sin cambiar de spec."] = "Selecciona una configuracion de talentos de la spec asignada al perfil. Puedes preparar perfiles de otras specs sin cambiar de spec.",
+    ["Talentos de la spec del perfil: %s"] = "Talentos de la spec del perfil: %s",
+    ["No encuentro loadouts de talentos para la spec asignada al perfil o la API no esta disponible."] = "No encuentro loadouts de talentos para la spec asignada al perfil o la API no esta disponible.",
+  },
+  enUS = {
+    ["Selecciona una configuracion de talentos de la spec asignada al perfil. Puedes preparar perfiles de otras specs sin cambiar de spec."] = "Select a talent loadout for the spec assigned to this profile. You can prepare profiles for other specs without switching spec.",
+    ["Talentos de la spec del perfil: %s"] = "Profile spec talents: %s",
+    ["No encuentro loadouts de talentos para la spec asignada al perfil o la API no esta disponible."] = "No talent loadouts found for the profile's assigned spec, or the API is unavailable.",
+  },
+  frFR = {
+    ["Selecciona una configuracion de talentos de la spec asignada al perfil. Puedes preparar perfiles de otras specs sin cambiar de spec."] = "Choisis une configuration de talents pour la spe assignee au profil. Tu peux preparer d'autres spes sans changer de spe.",
+    ["Talentos de la spec del perfil: %s"] = "Talents de la spe du profil : %s",
+    ["No encuentro loadouts de talentos para la spec asignada al perfil o la API no esta disponible."] = "Aucune configuration de talents trouvee pour la spe du profil, ou l'API n'est pas disponible.",
+  },
+  deDE = {
+    ["Selecciona una configuracion de talentos de la spec asignada al perfil. Puedes preparar perfiles de otras specs sin cambiar de spec."] = "Waehle eine Talentvorlage fuer die dem Profil zugewiesene Spezialisierung. Du kannst andere Spezialisierungen vorbereiten, ohne zu wechseln.",
+    ["Talentos de la spec del perfil: %s"] = "Talente der Profil-Spezialisierung: %s",
+    ["No encuentro loadouts de talentos para la spec asignada al perfil o la API no esta disponible."] = "Keine Talentvorlagen fuer die Profil-Spezialisierung gefunden, oder die API ist nicht verfuegbar.",
+  },
+  ruRU = {
+    ["Selecciona una configuracion de talentos de la spec asignada al perfil. Puedes preparar perfiles de otras specs sin cambiar de spec."] = "Select a talent loadout for the spec assigned to this profile. You can prepare profiles for other specs without switching spec.",
+    ["Talentos de la spec del perfil: %s"] = "Profile spec talents: %s",
+    ["No encuentro loadouts de talentos para la spec asignada al perfil o la API no esta disponible."] = "No talent loadouts found for the profile's assigned spec, or the API is unavailable.",
+  },
+  itIT = {
+    ["Selecciona una configuracion de talentos de la spec asignada al perfil. Puedes preparar perfiles de otras specs sin cambiar de spec."] = "Seleziona una configurazione talenti per la spec assegnata al profilo. Puoi preparare profili di altre spec senza cambiarla.",
+    ["Talentos de la spec del perfil: %s"] = "Talenti della spec del profilo: %s",
+    ["No encuentro loadouts de talentos para la spec asignada al perfil o la API no esta disponible."] = "Nessuna configurazione talenti trovata per la spec del profilo, oppure l'API non e disponibile.",
+  },
+  ptBR = {
+    ["Selecciona una configuracion de talentos de la spec asignada al perfil. Puedes preparar perfiles de otras specs sin cambiar de spec."] = "Selecione uma configuracao de talentos para a spec atribuida ao perfil. Voce pode preparar perfis de outras specs sem trocar de spec.",
+    ["Talentos de la spec del perfil: %s"] = "Talentos da spec do perfil: %s",
+    ["No encuentro loadouts de talentos para la spec asignada al perfil o la API no esta disponible."] = "Nenhuma configuracao de talentos encontrada para a spec do perfil, ou a API nao esta disponivel.",
+  },
+}
+
+for languageKey, entries in pairs(TALENT_SPEC_EXTRA) do
   T[languageKey] = T[languageKey] or {}
   for key, value in pairs(entries) do
     T[languageKey][key] = value

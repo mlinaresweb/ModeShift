@@ -15,6 +15,8 @@ local TABS = {
   { key = "help", text = "Ayuda" },
 }
 
+local DONATION_URL = "https://paypal.me/lynsonee"
+
 local MODE_TYPES = {
   "PVE",
   "PVP",
@@ -121,9 +123,19 @@ local function makeCheck(parent, text, checked, onClick)
   check:SetSize(24, 24)
   check.modeShiftTextKey = text
   check.Text:SetText(L(text or ""))
-  check.Text:SetWidth(520)
-  if check.Text.SetWordWrap then
-    check.Text:SetWordWrap(false)
+  if text and text ~= "" then
+    check.Text:ClearAllPoints()
+    check.Text:SetPoint("LEFT", check, "RIGHT", 4, 0)
+    check.Text:SetWidth(300)
+    check.Text:SetJustifyH("LEFT")
+    if check.Text.SetWordWrap then
+      check.Text:SetWordWrap(false)
+    end
+  else
+    check.Text:SetText("")
+    check.Text:ClearAllPoints()
+    check.Text:SetPoint("LEFT", check, "RIGHT", 0, 0)
+    check.Text:SetWidth(1)
   end
   check:SetChecked(checked and true or false)
   if onClick then
@@ -249,6 +261,64 @@ local function getClipboardText()
   return nil
 end
 
+local function tryOpenExternalURL(url)
+  local candidates = {
+    { C_Browser, "OpenExternalLink" },
+    { C_Browser, "OpenExternalURL" },
+    { C_Browser, "OpenURL" },
+    { C_Browser, "OpenWebLink" },
+    { C_WebBrowser, "OpenExternalLink" },
+    { C_WebBrowser, "OpenExternalURL" },
+    { C_WebBrowser, "OpenURL" },
+    { C_WebBrowser, "OpenWebLink" },
+    { C_StorePublic, "OpenExternalLink" },
+    { C_StorePublic, "OpenExternalURL" },
+  }
+
+  for _, candidate in ipairs(candidates) do
+    local object, methodName = candidate[1], candidate[2]
+    if object and type(object[methodName]) == "function" then
+      local ok, opened = pcall(object[methodName], url)
+      if ok and opened ~= false then
+        return true
+      end
+    end
+  end
+
+  local globals = { "OpenURL", "OpenExternalURL", "LaunchURL", "LaunchExternalURL" }
+  for _, globalName in ipairs(globals) do
+    local opener = _G[globalName]
+    if type(opener) == "function" then
+      local ok, opened = pcall(opener, url)
+      if ok and opened ~= false then
+        return true
+      end
+    end
+  end
+
+  if StaticPopup_Show and StaticPopupDialogs then
+    local popupNames = {
+      "CONFIRM_OPEN_URL",
+      "CONFIRM_OPEN_EXTERNAL_LINK",
+      "CONFIRM_OPEN_LINK",
+      "OPEN_URL",
+      "OPEN_EXTERNAL_LINK",
+      "EXTERNAL_LINK",
+    }
+
+    for _, popupName in ipairs(popupNames) do
+      if StaticPopupDialogs[popupName] then
+        local ok, dialog = pcall(StaticPopup_Show, popupName, url, nil, url)
+        if ok and dialog then
+          return true
+        end
+      end
+    end
+  end
+
+  return false
+end
+
 local function styleButton(button, selected)
   if not button then
     return
@@ -370,7 +440,7 @@ function ConfigUI:Initialize()
     return
   end
 
-  local frame = CreateFrame("Frame", "ModeShiftConfigFrame", UIParent, "BasicFrameTemplateWithInset")
+  local frame = CreateFrame("Frame", "ModeShiftConfigFrame", UIParent, BackdropTemplateMixin and "BackdropTemplate" or nil)
   if UISpecialFrames then
     local alreadyRegistered = false
     for _, frameName in ipairs(UISpecialFrames) do
@@ -386,6 +456,16 @@ function ConfigUI:Initialize()
   frame:SetSize(1040, 650)
   frame:SetPoint("CENTER")
   raiseFrame(frame)
+  if frame.SetBackdrop then
+    frame:SetBackdrop({
+      bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
+      edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+      tile = true,
+      tileSize = 32,
+      edgeSize = 24,
+      insets = { left = 6, right = 6, top = 6, bottom = 6 },
+    })
+  end
   if frame.SetBackdropColor then
     frame:SetBackdropColor(0.025, 0.025, 0.025, 0.96)
   end
@@ -417,31 +497,66 @@ function ConfigUI:Initialize()
     end
   end)
 
+  frame.customHeader = frame:CreateTexture(nil, "BORDER")
+  frame.customHeader:SetColorTexture(0.018, 0.016, 0.014, 0.98)
+  frame.customHeader:SetPoint("TOPLEFT", frame, "TOPLEFT", 6, -6)
+  frame.customHeader:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -6, -6)
+  frame.customHeader:SetHeight(42)
+
+  frame.customHeaderBottom = frame:CreateTexture(nil, "ARTWORK")
+  frame.customHeaderBottom:SetColorTexture(0.36, 0.34, 0.31, 0.9)
+  frame.customHeaderBottom:SetPoint("TOPLEFT", frame.customHeader, "BOTTOMLEFT", 0, 0)
+  frame.customHeaderBottom:SetPoint("TOPRIGHT", frame.customHeader, "BOTTOMRIGHT", 0, 0)
+  frame.customHeaderBottom:SetHeight(1)
+
+  frame.closeButton = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
+  frame.closeButton:SetFrameLevel(frame:GetFrameLevel() + 12)
+  frame.closeButton:SetPoint("RIGHT", frame.customHeader, "RIGHT", -8, 0)
+  frame.closeButton:SetScript("OnClick", function()
+    frame:Hide()
+  end)
+
+  frame.headerIcon = frame:CreateTexture(nil, "OVERLAY")
+  frame.headerIcon:SetTexture(ModeShift.Constants.DEFAULT_ICON)
+  frame.headerIcon:SetSize(24, 24)
+  frame.headerIcon:SetPoint("LEFT", frame.customHeader, "LEFT", 14, 0)
+  if frame.CreateMaskTexture and frame.headerIcon.AddMaskTexture then
+    frame.headerIconMask = frame:CreateMaskTexture()
+    frame.headerIconMask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+    frame.headerIconMask:SetSize(24, 24)
+    frame.headerIconMask:SetPoint("LEFT", frame.customHeader, "LEFT", 14, 0)
+    frame.headerIcon:AddMaskTexture(frame.headerIconMask)
+  end
+
   frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-  frame.title:SetPoint("LEFT", frame.TitleBg or frame, "LEFT", 8, 0)
+  frame.title:SetPoint("LEFT", frame.headerIcon, "RIGHT", 6, 0)
   frame.title:SetText("ModeShift")
 
-  frame.languageButton = makeButton(frame, "", 160, 20, function(button)
+  frame.author = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  frame.author:SetPoint("LEFT", frame.title, "RIGHT", 8, -1)
+  frame.author:SetText("by mlinaresweb")
+
+  frame.languageButton = makeButton(frame, "", 168, 20, function(button)
     self:OpenLanguageDropdown(button)
   end)
-  frame.languageButton:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -34, -5)
+  frame.languageButton:SetPoint("RIGHT", frame.closeButton, "LEFT", -8, 0)
 
   frame.leftTitle = makeText(frame, "Perfiles", "GameFontNormal")
-  frame.leftTitle:SetPoint("TOPLEFT", 16, -36)
+  frame.leftTitle:SetPoint("TOPLEFT", 16, -70)
 
   frame.leftPanelBg = frame:CreateTexture(nil, "BACKGROUND")
   frame.leftPanelBg:SetColorTexture(0, 0, 0, 0.35)
-  frame.leftPanelBg:SetPoint("TOPLEFT", 12, -54)
+  frame.leftPanelBg:SetPoint("TOPLEFT", 12, -88)
   frame.leftPanelBg:SetPoint("BOTTOMRIGHT", frame, "BOTTOMLEFT", 272, 86)
 
   frame.editorPanelBg = frame:CreateTexture(nil, "BACKGROUND")
   frame.editorPanelBg:SetColorTexture(0, 0, 0, 0.28)
-  frame.editorPanelBg:SetPoint("TOPLEFT", 280, -60)
+  frame.editorPanelBg:SetPoint("TOPLEFT", 280, -94)
   frame.editorPanelBg:SetPoint("BOTTOMRIGHT", -24, 18)
 
   frame.profileScroll = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
-  frame.profileScroll:SetPoint("TOPLEFT", 16, -60)
-  frame.profileScroll:SetSize(246, 475)
+  frame.profileScroll:SetPoint("TOPLEFT", 16, -94)
+  frame.profileScroll:SetSize(246, 441)
 
   frame.newButton = makeButton(frame, "Nuevo", 76, 24, function()
     local profile = ModeShift.ProfileManager:CreateProfileFromCurrentState()
@@ -489,14 +604,14 @@ function ConfigUI:Initialize()
       self:RefreshEditor()
       self:RefreshTabs()
     end)
-    button:SetPoint("TOPLEFT", x, -34)
+    button:SetPoint("TOPLEFT", x, -68)
     frame.tabButtons[tab.key] = button
     x = x + 92
   end
 
   frame.editorScroll = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
-  frame.editorScroll:SetPoint("TOPLEFT", 285, -66)
-  frame.editorScroll:SetSize(720, 540)
+  frame.editorScroll:SetPoint("TOPLEFT", 285, -100)
+  frame.editorScroll:SetSize(720, 506)
   frame.editorScroll:HookScript("OnVerticalScroll", function()
     self:CloseDropdown()
   end)
@@ -878,7 +993,7 @@ function ConfigUI:CaptureSelectedProfile(useNow)
     ModeShift.AddonProfileManager:ClearCache()
   end
   if ModeShift.ProfileManager and ModeShift.ProfileManager.CaptureCurrentAddonProfiles then
-    ModeShift.ProfileManager:CaptureCurrentAddonProfiles(profile)
+    ModeShift.ProfileManager:CaptureCurrentAddonProfiles(profile, { preserveSelections = true })
   end
 
   ModeShift.ProfileManager:SaveProfile(profile)
@@ -1302,12 +1417,19 @@ end
 
 function ConfigUI:BuildTalentsTab(parent, profile, y)
   y = self:AddSection(parent, "Loadout de talentos de Blizzard", y)
-  y = self:AddDescription(parent, "Selecciona una configuracion de talentos de la spec actual. Si el perfil pertenece a otra spec, cambia de spec antes de elegir.", y)
+  y = self:AddDescription(parent, "Selecciona una configuracion de talentos de la spec asignada al perfil. Puedes preparar perfiles de otras specs sin cambiar de spec.", y)
 
   local activeLoadout = ModeShift.TalentManager and ModeShift.TalentManager:GetCurrentLoadout(ModeShift:GetCurrentSpecId()) or nil
   local activeLabel = makeText(parent, L("Talentos activos ahora: %s", activeLoadout and activeLoadout.name or L("desconocidos")), "GameFontHighlight")
   activeLabel:SetPoint("TOPLEFT", 4, y)
   activeLabel:SetWidth(560)
+  y = y - 22
+
+  local targetSpecId = profile.specId or ModeShift:GetCurrentSpecId()
+  local targetSpecName = profile.specName or ModeShift:GetSpecNameById(targetSpecId) or targetSpecId or L("ninguna")
+  local targetLabel = makeText(parent, L("Talentos de la spec del perfil: %s", tostring(targetSpecName)), "GameFontHighlight")
+  targetLabel:SetPoint("TOPLEFT", 4, y)
+  targetLabel:SetWidth(560)
   y = y - 22
 
   local current
@@ -1333,12 +1455,16 @@ function ConfigUI:BuildTalentsTab(parent, profile, y)
     profile.talents.autoApply = checked
     self:SaveProfile(profile)
   end)
-  autoCheck:SetPoint("TOPLEFT", 180, y + 3)
+  autoCheck:SetPoint("TOPLEFT", disabledButton, "TOPRIGHT", 14, 2)
+  if autoCheck.Text then
+    autoCheck.Text:SetWidth(168)
+    autoCheck.Text:SetPoint("LEFT", autoCheck, "RIGHT", 2, 0)
+  end
 
   local openTalentsButton = makeButton(parent, "Abrir talentos", 135, 24, function()
     self:OpenBlizzardTalents()
   end)
-  openTalentsButton:SetPoint("TOPLEFT", 395, y)
+  openTalentsButton:SetPoint("TOPLEFT", 438, y)
 
   local refreshButton = makeButton(parent, "Actualizar", 100, 24, function()
     self:RefreshEditor()
@@ -1346,9 +1472,9 @@ function ConfigUI:BuildTalentsTab(parent, profile, y)
   refreshButton:SetPoint("LEFT", openTalentsButton, "RIGHT", 8, 0)
   y = y - 38
 
-  local loadouts = ModeShift.TalentManager:GetTalentLoadouts(ModeShift:GetCurrentSpecId())
+  local loadouts = ModeShift.TalentManager:GetTalentLoadouts(targetSpecId)
   if #loadouts == 0 then
-    y = self:AddDescription(parent, "No encuentro loadouts de talentos para la spec actual o la API no esta disponible.", y)
+    y = self:AddDescription(parent, "No encuentro loadouts de talentos para la spec asignada al perfil o la API no esta disponible.", y)
     return y
   end
 
@@ -1360,8 +1486,8 @@ function ConfigUI:BuildTalentsTab(parent, profile, y)
       profile.talents.enabled = true
       profile.talents.configId = loadout.id
       profile.talents.configName = loadout.name
-      profile.specId = ModeShift:GetCurrentSpecId()
-      profile.specName = ModeShift:GetCurrentSpecName()
+      profile.specId = loadout.specId or targetSpecId
+      profile.specName = ModeShift:GetSpecNameById(profile.specId) or targetSpecName
       self:SaveProfile(profile)
     end)
     styleButton(button, selected)
@@ -1545,7 +1671,7 @@ function ConfigUI:BuildAddonsTab(parent, profile, y)
 
     y = self:BuildAddonProfilePicker(parent, profile, addon.name, y, profileX, profileWidth)
     self:BuildAddonOptionPicker(parent, profile, addon.name, y, optionX, optionWidth)
-    y = y - 32
+    y = y - 38
   end
 
   return y
@@ -1567,10 +1693,10 @@ function ConfigUI:BuildAddonProfilePicker(parent, profile, addonName, y, x, widt
     currentProfile = ModeShift.AddonProfileManager:GetCurrentProfile(addonName, false)
   end
   local text = "Elegir perfil"
-  if currentProfile then
-    text = currentProfile
-  elseif hasSavedProfile then
+  if hasSavedProfile then
     text = entry.profileName
+  elseif currentProfile then
+    text = currentProfile
   end
 
   local currentButton = makeButton(parent, text, width or 220, 22, function(button)
@@ -1584,6 +1710,8 @@ function ConfigUI:BuildAddonProfilePicker(parent, profile, addonName, y, x, widt
 end
 
 function ConfigUI:SetAddonProfile(profile, addonName, profileName)
+  profile.addonProfiles = profile.addonProfiles or { enabled = true, entries = {} }
+  profile.addonProfiles.entries = profile.addonProfiles.entries or {}
   profile.addonProfiles.enabled = true
   if profileName == nil then
     local entry = profile.addonProfiles.entries[addonName]
@@ -1620,7 +1748,7 @@ function ConfigUI:OpenAddonProfileDropdown(anchor, profile, addonName)
 
   local entry = profile.addonProfiles and profile.addonProfiles.entries and profile.addonProfiles.entries[addonName] or nil
   local selected = entry and entry.profileName or nil
-  local effectiveSelected = currentProfile or selected
+  local effectiveSelected = selected or currentProfile
   local items = {}
   local seen = {}
 
@@ -1677,7 +1805,7 @@ function ConfigUI:BuildAddonOptionPicker(parent, profile, addonName, y, x, width
     currentOption = ModeShift.AddonProfileManager:GetCurrentOption(addonName, false)
   end
   local defaultText = isCooldownManagerAddon(addonName) and "Disenos CDM" or "Config..."
-  local selected = currentOption or entry.optionName or defaultText
+  local selected = entry.optionName or currentOption or defaultText
 
   local button = makeButton(parent, selected, width or 150, 22, function(anchor)
     self:OpenAddonOptionDropdown(anchor, profile, addonName)
@@ -1688,6 +1816,8 @@ function ConfigUI:BuildAddonOptionPicker(parent, profile, addonName, y, x, width
 end
 
 function ConfigUI:SetAddonOption(profile, addonName, optionName)
+  profile.addonProfiles = profile.addonProfiles or { enabled = true, entries = {} }
+  profile.addonProfiles.entries = profile.addonProfiles.entries or {}
   profile.addonProfiles.enabled = true
   local entry = profile.addonProfiles.entries[addonName] or { enabled = true }
   if optionName == nil and not entry.profileName then
@@ -1712,7 +1842,7 @@ function ConfigUI:OpenAddonOptionDropdown(anchor, profile, addonName)
 
   local entry = profile.addonProfiles and profile.addonProfiles.entries and profile.addonProfiles.entries[addonName] or nil
   local selected = entry and entry.optionName or nil
-  local effectiveSelected = currentOption or selected
+  local effectiveSelected = selected or currentOption
   local items = {}
   local seen = {}
 
@@ -1807,8 +1937,142 @@ function ConfigUI:BuildCVarsTab(parent, profile, y)
   return y
 end
 
+function ConfigUI:OpenDonationLink()
+  if tryOpenExternalURL(DONATION_URL) then
+    return
+  end
+
+  self:ShowDonationLinkPopup()
+end
+
+function ConfigUI:ShowDonationLinkPopup()
+  if not self.donationFrame then
+    local frame = CreateFrame("Frame", "ModeShiftDonationFrame", UIParent, "BasicFrameTemplateWithInset")
+    frame:SetSize(520, 168)
+    frame:SetPoint("CENTER")
+    raiseFrame(frame)
+    frame:SetMovable(true)
+    frame:EnableMouse(true)
+    frame:RegisterForDrag("LeftButton")
+    frame:SetScript("OnDragStart", frame.StartMoving)
+    frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
+
+    frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    frame.title:SetPoint("LEFT", frame.TitleBg or frame, "LEFT", 8, 0)
+
+    frame.message = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    frame.message:SetPoint("TOPLEFT", 18, -42)
+    frame.message:SetWidth(480)
+    frame.message:SetJustifyH("LEFT")
+
+    frame.editBox = makeEditBox(frame, 365, DONATION_URL)
+    frame.editBox:SetPoint("TOPLEFT", 18, -86)
+    frame.editBox:SetText(DONATION_URL)
+    frame.editBox:SetScript("OnEditFocusGained", function(self)
+      self:HighlightText()
+    end)
+    frame.editBox:SetScript("OnTextChanged", function(self)
+      if self:GetText() ~= DONATION_URL then
+        self:SetText(DONATION_URL)
+        self:SetCursorPosition(0)
+      end
+    end)
+
+    frame.copyButton = makeButton(frame, "Copiar enlace", 120, 24, function()
+      frame.editBox:SetFocus()
+      frame.editBox:HighlightText()
+      if setClipboardText(DONATION_URL) then
+        ModeShift:Print(L("enlace de donacion copiado al portapapeles."))
+      else
+        ModeShift:Print(L("enlace seleccionado. Pulsa Ctrl+C para copiarlo."))
+      end
+    end)
+    frame.copyButton:SetPoint("LEFT", frame.editBox, "RIGHT", 10, 0)
+
+    frame.closeButton = makeButton(frame, "Cerrar", 110, 24, function()
+      frame:Hide()
+    end)
+    frame.closeButton:SetPoint("BOTTOMRIGHT", -18, 16)
+
+    self.donationFrame = frame
+  end
+
+  self.donationFrame.title:SetText(L("Apoya ModeShift"))
+  self.donationFrame.message:SetText(L("WoW no ha permitido abrir el navegador automaticamente. Copia el enlace y pegalo en tu navegador."))
+  setButtonText(self.donationFrame.copyButton, "Copiar enlace")
+  setButtonText(self.donationFrame.closeButton, "Cerrar")
+  self.donationFrame.editBox:SetText(DONATION_URL)
+  self.donationFrame.editBox:SetFocus()
+  self.donationFrame.editBox:HighlightText()
+  raiseFrame(self.donationFrame)
+  self.donationFrame:Show()
+end
+
 function ConfigUI:BuildHelpTab(parent, profile, y)
   profile = profile or {}
+  y = self:AddSection(parent, "Apoya ModeShift", y)
+
+  local donateIcon = CreateFrame("Button", nil, parent, BackdropTemplateMixin and "BackdropTemplate" or nil)
+  donateIcon:SetSize(84, 34)
+  donateIcon:SetPoint("TOPLEFT", 4, y + 4)
+  if donateIcon.SetBackdrop then
+    donateIcon:SetBackdrop({
+      bgFile = "Interface\\Buttons\\WHITE8X8",
+      edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+      edgeSize = 10,
+      insets = { left = 2, right = 2, top = 2, bottom = 2 },
+    })
+    donateIcon:SetBackdropColor(0.94, 0.98, 1, 1)
+    donateIcon:SetBackdropBorderColor(0.35, 0.72, 1, 1)
+  end
+  donateIcon.payText = donateIcon:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  donateIcon.payText:SetPoint("RIGHT", donateIcon, "CENTER", 1, 0)
+  donateIcon.payText:SetText("Pay")
+  donateIcon.payText:SetTextColor(0.02, 0.12, 0.36)
+  donateIcon.palText = donateIcon:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  donateIcon.palText:SetPoint("LEFT", donateIcon, "CENTER", 1, 0)
+  donateIcon.palText:SetText("Pal")
+  donateIcon.palText:SetTextColor(0.05, 0.62, 1)
+  donateIcon:SetScript("OnClick", function()
+    self:OpenDonationLink()
+  end)
+
+  local donationText = makeText(parent, L("ModeShift se mantiene con tiempo y pruebas. Si te ayuda y quieres apoyar el desarrollo, puedes donar voluntariamente."))
+  donationText:SetPoint("TOPLEFT", 100, y + 2)
+  donationText:SetWidth(558)
+  y = y - 38
+
+  local donationBox = makeEditBox(parent, 310, DONATION_URL)
+  donationBox:SetPoint("TOPLEFT", 4, y + 4)
+  donationBox:SetText(DONATION_URL)
+  donationBox:SetCursorPosition(0)
+  donationBox:SetScript("OnEditFocusGained", function(self)
+    self:HighlightText()
+  end)
+  donationBox:SetScript("OnTextChanged", function(self)
+    if self:GetText() ~= DONATION_URL then
+      self:SetText(DONATION_URL)
+      self:SetCursorPosition(0)
+    end
+  end)
+
+  local openDonation = makeButton(parent, "Abrir PayPal", 130, 24, function()
+    self:OpenDonationLink()
+  end)
+  openDonation:SetPoint("LEFT", donationBox, "RIGHT", 10, 0)
+
+  local copyDonation = makeButton(parent, "Copiar enlace", 140, 24, function()
+    donationBox:SetFocus()
+    donationBox:HighlightText()
+    if setClipboardText(DONATION_URL) then
+      ModeShift:Print(L("enlace de donacion copiado al portapapeles."))
+    else
+      ModeShift:Print(L("enlace seleccionado. Pulsa Ctrl+C para copiarlo."))
+    end
+  end)
+  copyDonation:SetPoint("LEFT", openDonation, "RIGHT", 8, 0)
+  y = y - 42
+
   y = self:AddSection(parent, "Ayuda de ModeShift", y)
 
   local summary = makeText(parent, L("Perfil seleccionado: %s", tostring(profile.name or profile.id or L("ninguno"))), "GameFontHighlight")

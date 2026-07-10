@@ -80,8 +80,6 @@ function MinimapModule:Initialize()
   button:SetFrameLevel((Minimap:GetFrameLevel() or 0) + 8)
   updatePosition(button)
   button:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-  button:SetHighlightTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
-  button:SetPushedTexture("Interface\\Minimap\\UI-Minimap-ZoomButton-Highlight")
   button:SetScript("OnMouseDown", function(self, mouseButton)
     if mouseButton ~= "LeftButton" then
       return
@@ -93,6 +91,12 @@ function MinimapModule:Initialize()
     self.modeShiftDragStartY = py / scale
     self.modeShiftMouseDown = true
     self.modeShiftDragged = false
+    if self.icon then
+      self.icon:SetPoint("TOPLEFT", self, "TOPLEFT", 8, -7)
+    end
+    if self.iconMask then
+      self.iconMask:SetPoint("TOPLEFT", self, "TOPLEFT", 8, -7)
+    end
     self:SetScript("OnUpdate", updateDragPosition)
   end)
   button:SetScript("OnMouseUp", function(self, mouseButton)
@@ -102,6 +106,12 @@ function MinimapModule:Initialize()
     self.modeShiftDragStartY = nil
     self.modeShiftDragged = nil
     self:SetScript("OnUpdate", nil)
+    if self.icon then
+      self.icon:SetPoint("TOPLEFT", self, "TOPLEFT", 7, -6)
+    end
+    if self.iconMask then
+      self.iconMask:SetPoint("TOPLEFT", self, "TOPLEFT", 7, -6)
+    end
     if wasDragged then
       updatePosition(self)
       return
@@ -110,6 +120,12 @@ function MinimapModule:Initialize()
     minimapButton_Open(self, mouseButton)
   end)
   button:SetScript("OnEnter", function(self)
+    if self.icon then
+      self.icon:SetVertexColor(1.15, 1.15, 1.15, 1)
+    end
+    if self.border then
+      self.border:SetVertexColor(1, 0.92, 0.55, 1)
+    end
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:AddLine("ModeShift")
     GameTooltip:AddLine(L("Click izquierdo: configuracion"), 1, 1, 1)
@@ -117,7 +133,13 @@ function MinimapModule:Initialize()
     GameTooltip:AddLine(L("Arrastrar: mover alrededor del minimapa"), 1, 1, 1)
     GameTooltip:Show()
   end)
-  button:SetScript("OnLeave", function()
+  button:SetScript("OnLeave", function(self)
+    if self.icon then
+      self.icon:SetVertexColor(1, 1, 1, 1)
+    end
+    if self.border then
+      self.border:SetVertexColor(1, 1, 1, 1)
+    end
     GameTooltip:Hide()
   end)
 

@@ -243,11 +243,14 @@ function ProfileManager:CaptureCurrentAddons(profile)
   return profile
 end
 
-function ProfileManager:CaptureCurrentAddonProfiles(profile)
+function ProfileManager:CaptureCurrentAddonProfiles(profile, options)
   if type(profile) ~= "table" or not ModeShift.AddonProfileManager or not ModeShift.AddonManager then
     return profile
   end
 
+  options = options or {}
+  local preserveSelections = options.preserveSelections and true or false
+  local previousEntries = profile.addonProfiles and profile.addonProfiles.entries or {}
   profile.addonProfiles = ModeShift.Utils:CopyDefaults(profile.addonProfiles, { enabled = true, entries = {} })
   profile.addonProfiles.enabled = true
   profile.addonProfiles.entries = {}
@@ -266,11 +269,15 @@ function ProfileManager:CaptureCurrentAddonProfiles(profile)
       end
     end
 
-    if currentProfile or #profiles > 0 or currentOption or #options > 0 or extraState then
+    local previousEntry = previousEntries[addon.name]
+    local savedProfile = preserveSelections and type(previousEntry) == "table" and previousEntry.profileName or currentProfile
+    local savedOption = preserveSelections and type(previousEntry) == "table" and previousEntry.optionName or currentOption
+
+    if savedProfile or #profiles > 0 or savedOption or #options > 0 or extraState then
       profile.addonProfiles.entries[addon.name] = {
-        enabled = currentProfile ~= nil or currentOption ~= nil or extraState ~= nil,
-        profileName = currentProfile,
-        optionName = currentOption,
+        enabled = savedProfile ~= nil or savedOption ~= nil or extraState ~= nil,
+        profileName = savedProfile,
+        optionName = savedOption,
         extraState = extraState,
       }
     end
